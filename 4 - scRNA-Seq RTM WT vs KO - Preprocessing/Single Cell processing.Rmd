@@ -1,0 +1,222 @@
+---
+title: "scRNAseq RTM WT vs KO"
+author: "Abinet Joan"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+  header-includes:
+    -|
+    ```{=latex}
+    \usepackage{fvextra}
+    \DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+      breaksymbolleft={}, 
+      showspaces = false,
+      showtabs = false,
+      breaklines,
+      commandchars=\\\{\}
+    }
+    ```
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+\newpage
+
+# Introduction
+
+Fifty thousand CD45+Lin-Ly6C-CD11b+CD115+ live cells from the peritoneal lavage, 50000 CD45+Lin-Ly6C-CD11bint/+F4/80+CD64+ live cells from the livers, 50000 CD45+Lin-CD11b+F4/80+CD64+ live cells from the colons and 50000 CD45+Lin-Ly6C-CD11b+F4/80+CD64+ live cells from the brains of Lyz2CreMafbfl/fl mice and Mafbfl/fl littermate controls were FACS-sorted in PBS with 5% FBS. Sorted cells were barcoded with TotalSeq™-B anti-mouse Hashtag antibodies (Biolegend). Hashtag barcoded cells were washed, pooled per genotype, spun down and resuspended in PBS with 0.04% UltraPure™ BSA (Invitrogen, AM2616) at an estimated final concentration of 1000 cells/\textmu{}l. Cell suspensions were loaded into the Chromium Controller (10x Genomics) at a target recovery of 2000 cell per sorted population, to generate single-cell Gel Bead-in-EMulsion (GEMs). Single-cell RNA-Seq libraries were prepared using Chromium Single Cell 3\char"2032 GEM, Library & Gel Bead Kit v3 (10x Genomics) according to manufacturer’s instructions. 
+
+The cDNAs were amplified and libraries compatible with Illumina sequencers were generated using Chromium Single Cell 3C GEM, Library & Gel Bead Kit v3 (10x Genomics). For Hash Tag Oligonucleotide (HTO) library, 1 \textmu{}l HTO additive primer v2 (0.2 \textmu{}M stock) were added to the mix at the cDNA amplification step. The libraries were sequenced on an Illumina NovaSeq sequencer on an SP100 cell flow (read 1, 28 cy; read 2, 76 cy; index 1, 10 cy; index 2, 10 cy) at a depth of 50,000 reads per cell. Demultiplexing, alignment to the mouse genome (GRCm38/mm10), filtering, unique molecular identifier counting and construction of gene-barcode matrices of the single cell RNA-Seq data were performed using Cell Ranger (7.1.0). Single cell RNA-Seq data were further analyzed using R Bioconductor (4.3.3) and the Seurat package (4.3.0). All samples were merged and integrated with previously published single cell RNA-seq data containing CD45+SSCloCD11b+F4/80+CD64+ lung IM cells of Lyz2CreMafbfl/fl mice and Mafbfl/fl littermate controls (GSE193891). Next, filtered matrices containing cell IDs and feature names for each sample were used to construct a Seurat object. Quality control was performed by excluding cells with fewer than 200 detected genes, genes detected in fewer than three cells, and cells with more than 10% mitochondrial gene content. Gene counts for each sample were normalized using the default LogNormalize method, with a scale factor of 10,000 followed by log transformation. The top 2,000 highly variable features were identified using the vst method. Contaminating and actively proliferating cells were removed based on the expression of specific genes. Cells were clustered using the FindClusters function and the macrophage subsets were identified based on the expression of Hashtag barcodes and known macrophage subset specific genes. DEGs between macrophages subsets from Mafbfl/fl and Lyz2CreMafbfl/fl mice were determined using the FindMarkers method.
+
+# Load packages
+```{r}
+suppressMessages(library(dplyr))
+suppressMessages(library(Seurat))
+suppressMessages(library(patchwork))
+suppressMessages(library(ggplot2))
+suppressMessages(library(stringr))
+suppressMessages(library(SingleR))
+suppressMessages(library(scuttle))
+suppressMessages(library(scRNAseq))
+suppressMessages(library(SingleCellExperiment))
+suppressMessages(library(RColorBrewer))
+suppressMessages(library(formatR))
+```
+
+# Loading Data
+The count files can be download from GEO
+```{r, message=FALSE, warning=FALSE, results= "hide" }
+all_dirs <- dir(path = "Counts") # Specifiy your 10x directory
+
+list_sample <- list()
+for (i in 1:length(all_dirs)) {
+  
+  print(i)
+  Seq_raw_file <- Read10X(data.dir = paste0("Counts/",all_dirs[i]))
+  Seurat_file <- CreateSeuratObject(counts = Seq_raw_file$`Gene Expression`, all_dirs[i], min.cells = 3, min.features =   200)
+  list_sample <- append(list_sample, Seurat_file)
+}
+```
+
+```{r}
+Sc_Macro <- merge(list_sample[[1]], y = list_sample[-1], add.cell.ids = c("P2_1", "P2_2","P1_1","P1_2","P2_4","P2_5","P1_4","P1_5"), project = "Macro_whole_body")
+```
+
+# Importing Lung Macrophages
+Can be obtained from (GSE193891)
+```{r}
+Lung_MafbKO <- readRDS("MafbKO_Ctl.seuratObject.Rds")
+DimPlot(Lung_MafbKO, group.by = "cell.type2")
+Lung_MafbKO$orig.ident <- Lung_MafbKO$cell.type2
+Lung_MafbKO <- subset(Lung_MafbKO, cell.type2 %in% c("IM", "Mafb-independent"))
+
+Lung_MafbKO@meta.data <- Lung_MafbKO@meta.data[,c(1:6)]
+```
+
+# Combining Macrophage together
+```{r}
+Lung_MafbKO <- RenameCells(Lung_MafbKO, new.names = paste0("P1_",colnames(Lung_MafbKO)))
+Sc_Macro <- merge(Sc_Macro, Lung_MafbKO)
+```
+
+# Quality control
+```{r}
+Sc_Macro[["percent.mt"]] <- PercentageFeatureSet(Sc_Macro, pattern = "^mt-")
+VlnPlot(Sc_Macro, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, pt.size = 0.1)
+```
+
+```{r}
+Sc_Macro <- subset(Sc_Macro, subset = nFeature_RNA > 200 & nFeature_RNA < 8000 & percent.mt < 10 & nCount_RNA < 80000) 
+VlnPlot(Sc_Macro, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), group.by = "orig.ident", ncol = 3, pt.size = 0.1)
+```
+
+# Pre-processing workflow
+```{r, message=FALSE, warning=FALSE, results= "hide" }
+# Normalizing the data
+Sc_Macro <- NormalizeData(Sc_Macro, normalization.method = "LogNormalize", scale.factor = 10000)
+
+# Feature selection
+Sc_Macro <- FindVariableFeatures(Sc_Macro, selection.method = "vst", nfeatures = 2000) 
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(Sc_Macro), 10)
+
+# plot variable features without labels
+plot1 <- VariableFeaturePlot(Sc_Macro)
+plot1 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+
+# Scaling the data
+all.genes <- rownames(Sc_Macro)
+Sc_Macro <- ScaleData(Sc_Macro, features = all.genes)
+
+# Linear dimensional reduction
+Sc_Macro <- RunPCA(Sc_Macro, features = VariableFeatures(object = Sc_Macro))
+plot2 <- DimPlot(Sc_Macro, reduction = "pca")
+
+# Determine the ‘dimensionality’ of the dataset
+Sc_Macro <- JackStraw(Sc_Macro, num.replicate = 100)
+Sc_Macro <- ScoreJackStraw(Sc_Macro, dims = 1:20)
+plot3 <- JackStrawPlot(Sc_Macro, dims = 1:20)
+plot4 <- ElbowPlot(Sc_Macro,ndims = 30)
+
+# Cluster cells in umap
+Sc_Macro <- FindNeighbors(Sc_Macro, dims = 1:25)
+Sc_Macro <- FindClusters(Sc_Macro, resolution = 0.8)
+Sc_Macro <- RunUMAP(Sc_Macro, dims = 1:25)
+```
+
+```{r fig.width=12, fig.height=10 }
+plot1+ plot2 + plot3 +plot4
+```
+
+# Visualizing all clusters
+```{r}
+DimPlot(Sc_Macro, reduction = "umap", label = T)
+```
+
+```{r}
+DimPlot(Sc_Macro, reduction = "umap", label = T, group.by = "orig.ident")
+```
+
+# Differential expression analysis
+```{r, eval = FALSE}
+Macro.markers <- FindAllMarkers(Sc_Macro, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+Macro.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 10, order_by = avg_log2FC)
+```
+
+The cluster 9,10,14,15,17  were considered as non relevant and have been removed
+- Cluster 9: proliferating cells
+- Cluster 10: Dendritic cells
+- Cluster 14: endothelial cells
+- Cluster 15: unknown
+- Cluster 17: unknown
+
+
+# Removing contaminent, based on marker annotation.
+```{r, message=FALSE, warning=FALSE, results= "hide" }
+Sc_Macro_filter <- subset(Sc_Macro, seurat_clusters %in% c(9,10, 14,15,17), invert=T )
+
+ElbowPlot(Sc_Macro_filter)
+Sc_Macro_filter <- FindNeighbors(Sc_Macro_filter, dims = 1:15)
+Sc_Macro_filter <- FindClusters(Sc_Macro_filter, resolution = 0.7)
+Sc_Macro_filter <- RunUMAP(Sc_Macro_filter, dims = 1:15)
+```
+
+```{r}
+DimPlot(Sc_Macro_filter, reduction = "umap", label = T)
+```
+
+
+# Defining subset of interrest
+```{r}
+Sc_Macro_filter$Condition <- Sc_Macro_filter$orig.ident
+
+`%notin%` <- function(x, table){
+  !(x %in% table)
+}
+
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "KO_Colon" & Sc_Macro_filter$seurat_clusters %in% c(0,8))] <- "Ly6C+ CM KO" 
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "WT_Colon" & Sc_Macro_filter$seurat_clusters %in% c(0,8))] <- "Ly6C+ CM WT" 
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "KO_Colon" & Sc_Macro_filter$seurat_clusters %notin% c(0,8))] <- "MHC2+ CM KO" 
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "WT_Colon" & Sc_Macro_filter$seurat_clusters %notin% c(0,8))] <- "MHC2+ CM WT" 
+
+
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "KO_Peritoneum" & Sc_Macro_filter$seurat_clusters %in% c(9))] <- "SPM KO" 
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "WT_Peritoneum" & Sc_Macro_filter$seurat_clusters %in% c(9))] <- "SPM WT" 
+
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "KO_Peritoneum" & Sc_Macro_filter$seurat_clusters %notin% c(9))] <- "LPM KO" 
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "WT_Peritoneum" & Sc_Macro_filter$seurat_clusters %notin% c(9))] <- "LPM WT" 
+
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "IM")] <- "IM WT" 
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "Mafb-independent")] <- "IM KO" 
+
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "WT_Liver")] <- "KC WT" 
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "KO_Liver")] <- "KC KO" 
+
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "WT_Brain")] <- "MG WT" 
+Sc_Macro_filter$Condition[(Sc_Macro_filter$orig.ident == "KO_Brain")] <- "MG KO" 
+```
+
+```{r}
+Sc_Macro_filter$Condition <- factor(Sc_Macro_filter$Condition, levels =  c("SPM WT", "SPM KO", "LPM WT", "LPM KO", "KC WT", "KC KO", "IM WT", "IM KO", "Ly6C+ CM WT", "Ly6C+ CM KO", "MHC2+ CM WT", "MHC2+ CM KO", "MG WT", "MG KO"))
+
+pal <-c("#6A3D9A", "#CAB2D6", "#E31A1C", "#FB9A99", "#33A02C", "#B2DF8A", "#1F78B4", "#A6CEE3", "#FF7F00", "#FDBF6F", "#FF00FA", "#FFA1FD", "#87421F", "#CDAA7D")
+DimPlot(Sc_Macro_filter, group.by = "Condition", label = T, cols = pal)
+```
+
+# saving data
+```{r}
+#saveRDS(Sc_Macro_filter,"Sc_Macro_filter.rds")
+```
+
+```{r}
+sessionInfo()
+```
+
+
