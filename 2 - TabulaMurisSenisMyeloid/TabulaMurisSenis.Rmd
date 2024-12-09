@@ -1,0 +1,263 @@
+---
+title: "Tabula Muris Senis Myeloid"
+author: "Domien Vanneste"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+  header-includes:
+    -|
+    ```{=latex}
+    \usepackage{fvextra}
+    \DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+      breaksymbolleft={}, 
+      showspaces = false,
+      showtabs = false,
+      breaklines,
+      commandchars=\\\{\}
+    }
+    ```
+---
+
+
+```{r include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+# Load packages
+
+```{r}
+suppressMessages({
+library(Seurat)
+library(ggplot2)
+library(reticulate)
+library(sceasy)
+library(ggsci)
+library("scales")
+library(ggrastr)
+library(OmnipathR)
+library(decoupleR)
+library(dplyr)
+library(tibble)
+library(tidyr)
+library(patchwork)
+})
+```
+
+# Download Tabula Muris Senis scanpy object from AWS server
+```{bash, eval = FALSE}
+~$ aws s3 cp --no-sign-request s3://czb-tabula-muris-senis/Data-objects/tabula-muris-senis-bbknn-processed-official-annotations.h5ad /home/uliege/Documents/BioInformatics/TabulaMurisSenis
+download: s3://czb-tabula-muris-senis/Data-objects/tabula-muris-senis-bbknn-processed-official-annotations.h5ad to Documents/BioInformatics/TabulaMurisSenis/tabula-muris-senis-bbknn-processed-official-annotations.h5ad
+```
+
+
+# Convert Scanpy object to Seurat object
+```{r, eval = FALSE}
+sceasy::convertFormat("tabula-muris-senis-bbknn-processed-official-annotations.h5ad", from="anndata", to="seurat",
+                       outFile='tbms.rds')
+```
+
+# Load Seurat object
+```{r}
+tbms <- readRDS(file = "tbms.rds")
+```
+
+
+```{r}
+DimPlot(tbms, group.by = "louvain", label = T, raster = T)
+```
+
+# Subset myeloid cells
+
+Myeloid cell clusters were identified based on the combined expression of Ptprc (CD45) anf Lyz2 (LysM).
+
+```{r}
+FeaturePlot(tbms, features = "Ptprc", raster = T)
+```
+
+```{r}
+VlnPlot(tbms, features = "Ptprc", group.by = "louvain", pt.size = 0)
+```
+
+```{r}
+FeaturePlot(tbms, features = "Lyz2", raster = T)
+```
+
+```{r}
+VlnPlot(tbms, features = "Lyz2", group.by = "louvain", pt.size = 0)
+```
+
+```{r}
+Myeloid_Cells <-c(2, 3, 9, 11, 12, 15, 16, 36, 43, 45, 48, 52)
+
+tbms_myeloid <- subset(tbms, subset = louvain %in% Myeloid_Cells)
+```
+
+```{r}
+DimPlot(tbms_myeloid, raster = T)+theme(legend.position='none')
+```
+
+# Normalization and scaling of myeloid cells
+
+```{r}
+tbms_myeloid <- FindVariableFeatures(tbms_myeloid, selection.method = "vst", nfeatures = 2000)
+all.genes <- rownames(tbms_myeloid)
+tbms_myeloid <- ScaleData(tbms_myeloid, features = all.genes)
+tbms_myeloid <- RunPCA(tbms_myeloid, features = VariableFeatures(object = tbms_myeloid))
+ElbowPlot(tbms_myeloid, ndims = 50)
+```
+
+# Clustering of myeloid cells
+```{r}
+tbms_myeloid <- FindNeighbors(tbms_myeloid, dims = 1:7)
+tbms_myeloid <- FindClusters(tbms_myeloid, resolution = 0.35)
+tbms_myeloid <- RunUMAP(tbms_myeloid, dims = 1:7)
+DimPlot(tbms_myeloid, label = T, raster = T)
+```
+
+
+```{r}
+DimPlot(tbms_myeloid, group.by = "tissue", label = T, raster = T)
+```
+
+# Removal of contaminating cells
+
+```{r}
+cluster16.markers <- FindMarkers(tbms_myeloid, ident.1 = 16, only.pos = TRUE)
+```
+Cluster 16 are proliferating cells
+
+```{r}
+cluster17.markers <- FindMarkers(tbms_myeloid, ident.1 = 17, only.pos = TRUE)
+```
+Cluster 17 are mast cells
+
+```{r}
+tbms_myeloid <- subset(tbms_myeloid, idents = c(16, 17), invert = T)
+```
+
+
+```{r}
+DimPlot(tbms_myeloid, label = T, raster = T)
+```
+
+# Assigning celltypes to clusters
+
+```{r}
+tbms_myeloid$cell_type <- factor(Idents(tbms_myeloid), labels = c("cMo", "Mature Neu", "Immature Neu", "cDC", "MG", "preNeu", "RTM", "MG", "GMP", "cMoP", "KC", "pMo", "proNeu", "pDC", "AM", "IM"))
+
+tbms_myeloid$cell_type <- factor(tbms_myeloid$cell_type, levels = c("cMo", "Mature Neu", "Immature Neu", "cDC", "MG", "preNeu", "RTM", "GMP", "cMoP", "KC", "pMo", "proNeu", "pDC", "AM", "IM"))
+
+Idents(tbms_myeloid) <- "cell_type"
+
+DimPlot(tbms_myeloid, label = T, raster = T)
+```
+
+```{r}
+tbms_myeloid$cell_type <- factor(tbms_myeloid$cell_type, levels = c("GMP", "proNeu", "preNeu", "Immature Neu", "Mature Neu", "cMoP", "cMo", "pMo", "cDC", "pDC", "AM", "IM", "KC", "RTM", "MG"))
+
+Idents(tbms_myeloid) <- "cell_type"
+
+DimPlot(tbms_myeloid, raster = T)
+```
+
+
+```{r}
+show_col(pal_igv("default")(15))
+```
+
+```{r}
+cols <- c(pal_igv("default")(15))
+
+DimPlot(tbms_myeloid, label = T, cols = cols, group.by = "cell_type", raster = T)
+```
+
+```{r}
+DimPlot(tbms_myeloid, cols = cols, group.by = "cell_type", raster = T)+ggtitle("Tabula Muris Senis Myeloid")
+```
+
+
+# Viualize Mafb expression
+
+```{r}
+FeaturePlot(tbms_myeloid, features = "Mafb", max.cutoff = 'q90', cols = c("lightgrey","red"), raster = T)+ggtitle("Mafb expression")
+```
+
+
+```{r}
+VlnPlot(tbms_myeloid, features = "Mafb", pt.size = 0, cols = cols)+NoLegend()+ggtitle("Mafb expression")
+```
+
+
+# Calculate and viualize MafB activity with decoupleR
+
+## Load CollecTRI network
+
+CollecTRI is a comprehensive resource containing a curated collection of TFs and their transcriptional targets.
+
+```{r}
+net <- get_collectri(organism="mouse", split_complexes=FALSE)
+net
+```
+
+## Activity inference with Univariate Linear Model (ULM)
+
+To infer TF enrichment scores we will run the Univariate Linear Model (ulm) method. For each sample in our dataset (mat) and each TF in our network (net), it fits a linear model that predicts the observed gene expression based solely on the TF’s TF-Gene interaction weights. Once fitted, the obtained t-value of the slope is the score. If it is positive, we interpret that the TF is active and if it is negative we interpret that it is inactive.
+
+```{r}
+# Extract the normalized log-transformed counts
+mat <- as.matrix(tbms_myeloid@assays$RNA@data)
+
+# Run ulm
+acts <- run_ulm(mat=mat, net=net, .source='source', .target='target', .mor='mor', minsize = 5)
+
+acts
+```
+
+## Visualize
+
+```{r}
+# Extract ulm and store it in tfsulm in seurat object
+tbms_myeloid[['tfsulm']] <- acts %>%
+  pivot_wider(id_cols = 'source', names_from = 'condition',
+              values_from = 'score') %>%
+  column_to_rownames('source') %>%
+  Seurat::CreateAssayObject(.)
+
+# Change assay
+DefaultAssay(object = tbms_myeloid) <- "tfsulm"
+
+# Scale the data
+tbms_myeloid <- ScaleData(tbms_myeloid)
+tbms_myeloid@assays$tfsulm@data <- tbms_myeloid@assays$tfsulm@scale.data
+```
+
+```{r}
+FeaturePlot(tbms_myeloid, features = "Mafb", min.cutoff = 'q10', max.cutoff = 'q90', cols = c("lightgrey", "red"), raster = T)+ggtitle("MafB activity")
+```
+
+
+```{r}
+VlnPlot(tbms_myeloid, features = "Mafb", pt.size = 0, cols = cols)+NoLegend()+ggtitle("MafB activity")
+```
+
+
+# Session information 
+
+R sesssion: 
+
+```{r}
+sessionInfo()
+```
+
+
+
+
+
+
+
+
+
+
+
