@@ -1,0 +1,56 @@
+---
+title: "Microarray ImmGen"
+author: "Domien Vanneste"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+  header-includes:
+    -|
+    ```{=latex}
+    \usepackage{fvextra}
+    \DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+      breaksymbolleft={}, 
+      showspaces = false,
+      showtabs = false,
+      breaklines,
+      commandchars=\\\{\}
+    }
+    ```
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+# Introduction
+In order to identify transcriptional regulators of mac identity, we examined ImmGen microarray gene expression data from monocyte, dendritic cell (DCs) and RTM populations. Top 50 upregulated genes in RTM compared to DCs and monocytes were retrieved by comparing gene expression levels between RTM, and monocytes and DCs in the ImmGen database using the ImmGen Population Comparison data browser. Microarry data was then uploaded into the Gene Expression Commons (GEXC) server and gene activity of the top 50 upregulated genes in RTM was extracted.
+
+# Load packages
+```{r}
+suppressMessages({
+library(readxl)
+library(ComplexHeatmap)
+})
+```
+
+# Load data
+```{r}
+DEG_top50 <- read_excel("DEG_top50.xlsx")
+
+DEG_top50 <- as.data.frame(DEG_top50)
+
+rownames(DEG_top50) <- DEG_top50$Genes
+
+DEG_top50 <- DEG_top50[,-1]
+```
+
+# Plot heatmap
+```{r fig.height= 8.5, fig.width=8}
+Heatmap(DEG_top50, cluster_columns =  F, heatmap_legend_param = list(title = "Gene activity"), row_names_gp = gpar(fontsize = 10), column_names_gp = gpar(fontsize = 11), column_names_side = c("top"))
+```
+
+```{r}
+sessionInfo()
+```
+
