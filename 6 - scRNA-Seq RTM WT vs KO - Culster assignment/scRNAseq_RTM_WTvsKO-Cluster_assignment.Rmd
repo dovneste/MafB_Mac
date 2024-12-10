@@ -1,0 +1,180 @@
+---
+title: "scRNA-Seq RTM WT vs KO - Cluster assignment"
+author: "Domien Vanneste"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  header-includes: "-| ```{=latex} \\usepackage{fvextra} \\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+    breaksymbolleft={}, showspaces = false, showtabs = false, breaklines, commandchars=\\\\\\{\\}
+    } ```"
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+# Introduction
+
+scRNA-Seq data of RTM from Mafbfl/fl (WT) and Lyz2Cre Mafbfl/fl (KO) mice was projected in global and genotype-specific uniform manifold approximation and projection (UMAP) plots. Based on the expression of hashtag barcodes and known RTM-specific genes, we identified mac populations corresponding to SPMs (Cd226, Retnla) and LPMs (Gata6, Icam2) in the peritoneal lavage; Kupffer cells (KCs) (Clec4f, Cdh5) in the liver; IMs (Mgl2, Ccl2) in the lung; and microglia (MG) (Tmem119, Sall1) in the brain (Figure 3C). In the colon, we identify two clusters of colonic macrophages (CMs) characterized by the expression of Plac8 and Ly6c2, and Cd4 and H2-M2, respectively. By mapping signature scores for Ly6C+ CMs and MHC-II+ CMs using DEGs between Ly6C+ cells and MHC-II+ cells in the monocyte waterfall, we found that Plac8/Ly6c2+  and Cd4/H2-M2+ CMs largely corresponded to Ly6C+ CM and MHC-II+ CM, respectively.
+
+Efficient Mafb depletion was confirmed in all RTM subsets from Lyz2Cre Mafbfl/fl mice
+
+# Load packages
+```{r}
+suppressMessages({
+library(Seurat)
+library(ggplot2)
+library(RColorBrewer)
+library(readxl)
+})
+```
+
+# Load Seurat object
+```{r}
+sc <- readRDS(file = "Sc_Macro_filter.rds")
+
+DimPlot(sc, group.by = "Condition")
+
+Idents(sc) <- "Condition"
+
+DimPlot(sc)
+```
+
+# Data visualization and Cluster assignment
+
+## Global UMAP
+
+```{r fig.height=5, fig.width=7}
+pal <-c("#6a3d9a", "#cab2d6", "#e31a1c", "#fb9a99", "#33a02c", "#b2df8a", "#1f78b4", "#a6cee3", "#ff7f00", "#fdbf6f", "#ff00fa", "#ffa1fd", "#87421f", "#cdaa7d")
+
+DimPlot(sc, cols = pal)
+```
+
+## Genotype specific UMAP
+
+### Mafbfl/fl (WT)
+
+```{r}
+sc$cell.type.control <- as.character(sc@active.ident)
+
+sc$cell.type.control[WhichCells(sc, idents = c("SPM KO", "LPM KO", "KC KO", "IM KO", "Ly6C+ CM KO", "MHC2+ CM KO", "MG KO"))] <- "MafB-KO"
+
+sc$cell.type.control <- factor(sc$cell.type.control, levels = c("SPM WT", "LPM WT", "KC WT", "IM WT", "Ly6C+ CM WT", "MHC2+ CM WT", "MG WT", "MafB-KO"))
+```
+
+```{r fig.height=5, fig.width=5}
+pal_wt <- c("#6a3d9a", "#e31a1c", "#33a02c", "#1f78b4", "#ff7f00",  "#ff00fa", "#87421f", "lightgrey")
+
+DimPlot(sc, cols = pal_wt, group.by = "cell.type.control")+ theme(legend.position = 'none', plot.title = element_blank())
+```
+
+### Lyz2Cre Mafbfl/fl (KO)
+
+```{r}
+sc$cell.type.mafbko <- as.character(sc@active.ident)
+
+sc$cell.type.mafbko [WhichCells(sc, idents = c("SPM WT", "LPM WT", "KC WT", "IM WT", "Ly6C+ CM WT", "MHC2+ CM WT", "MG WT"))] <- "MafB-WT"
+
+
+sc$cell.type.mafbko  <- factor(sc$cell.type.mafbko , levels = c("SPM KO", "LPM KO", "KC KO", "IM KO", "Ly6C+ CM KO", "MHC2+ CM KO", "MG KO", "MafB-WT"))
+```
+
+```{r fig.height=5, fig.width=5}
+pal_ko <- c("#cab2d6", "#fb9a99", "#b2df8a", "#a6cee3", "#fdbf6f",  "#ffa1fd", "#cdaa7d", "lightgrey")
+
+DimPlot(sc, cols = pal_ko, group.by = "cell.type.mafbko")+ theme(legend.position = 'none', plot.title = element_blank())
+```
+
+## Dotplot RTM subset specific genes
+
+```{r}
+sc$cell.type <- as.character(sc@active.ident)
+
+sc$cell.type[WhichCells(sc, idents = c("SPM WT", "SPM KO"))] <- "SPM"
+sc$cell.type[WhichCells(sc, idents = c("LPM WT", "LPM KO"))] <- "LPM"
+sc$cell.type[WhichCells(sc, idents = c("KC WT", "KC KO"))] <- "KC"
+sc$cell.type[WhichCells(sc, idents = c("IM WT", "IM KO"))] <- "IM"
+sc$cell.type[WhichCells(sc, idents = c("Ly6C+ CM WT", "Ly6C+ CM KO"))] <- "Ly6C+ CM"
+sc$cell.type[WhichCells(sc, idents = c("MHC2+ CM WT", "MHC2+ CM KO"))] <- "MHC2+ CM"
+sc$cell.type[WhichCells(sc, idents = c("MG WT", "MG KO"))] <- "MG"
+
+DimPlot(sc, group.by = "cell.type")
+
+Idents(sc) <- "cell.type"
+
+levels(sc) <- c("SPM", "LPM", "KC", "IM", "Ly6C+ CM", "MHC2+ CM", "MG")
+
+DimPlot(sc)
+```
+
+```{r fig.height=4, fig.width=8.3}
+levels(sc) <- c("MG", "MHC2+ CM", "Ly6C+ CM", "IM", "KC", "LPM", "SPM")
+
+DotPlot(sc, cols = c("lightgrey", "red"), features = c("Cd226", "Retnla", "Gata6", "Icam2", "Clec4f", "Cdh5", "Mgl2", "Ccl2", "Plac8", "Ly6c2",  "Cd4", "H2-M2", "Tmem119", "Sall1")) + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+levels(sc) <- c("SPM", "LPM", "KC", "IM", "Ly6C+ CM", "MHC2+ CM", "MG")
+```
+
+## Dotplot CM subset specific signature
+
+```{r}
+Ly6C_CM_sign <- read_excel("Ly6C_CM_sign.xlsx")
+
+Ly6C_CM_sign <- Ly6C_CM_sign$Ly6C_CM_sign
+
+Ly6C_CM_sign <- list(Ly6C_CM_sign)
+
+sc <- AddModuleScore(sc, features = Ly6C_CM_sign, name = 'Ly6C_CM_sign')
+
+VlnPlot(sc, features = "Ly6C_CM_sign1", pt.size = 0)
+```
+
+```{r}
+MHC2_CM_sign <- read_excel("MHC2_CM_sign.xlsx")
+
+MHC2_CM_sign <- MHC2_CM_sign$MHC2_CM_sign
+
+MHC2_CM_sign <- list(MHC2_CM_sign)
+
+sc <- AddModuleScore(sc, features = MHC2_CM_sign, name = 'MHC2_CM_sign')
+
+VlnPlot(sc, features = "MHC2_CM_sign1", pt.size = 0)
+```
+
+```{r fig.height=1.5, fig.width=7.3}
+levels(sc) <- c("MG", "MHC2+ CM", "Ly6C+ CM", "IM", "KC", "LPM", "SPM")
+
+DotPlot(sc, cols = c("lightgrey", "red"), features = c("Ly6C_CM_sign1", "MHC2_CM_sign1"), idents = c("MHC2+ CM", "Ly6C+ CM"))
+
+levels(sc) <- c("SPM", "LPM", "KC", "IM", "Ly6C+ CM", "MHC2+ CM", "MG")
+```
+
+```{r}
+Idents(sc) <- "Condition"
+```
+
+# Validation MafB KO
+
+```{r fig.height=5, fig.width=5.4}
+FeaturePlot(sc, features = "Mafb", cols = c("lightgrey", "red"), max.cutoff = "q90")
+```
+
+```{r fig.height=5, fig.width=10}
+VlnPlot(sc, features = "Mafb", cols = pal, pt.size = 0)
+```
+
+```{r}
+saveRDS(sc, "sc.rds")
+```
+
+```{r}
+sessionInfo()
+```
+
+
