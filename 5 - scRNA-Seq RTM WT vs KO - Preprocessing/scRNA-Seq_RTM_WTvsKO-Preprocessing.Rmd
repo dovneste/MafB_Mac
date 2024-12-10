@@ -75,6 +75,8 @@ Lung_MafbKO$orig.ident <- Lung_MafbKO$group
 Lung_MafbKO <- subset(Lung_MafbKO, cell.type2 %in% c("IM", "Mafb-independent"))
 
 Lung_MafbKO@meta.data <- Lung_MafbKO@meta.data[,c(1:6)]
+
+Idents(Lung_MafbKO) <- "orig.ident"
 ```
 
 # Combining Macrophage together
@@ -211,7 +213,7 @@ DimPlot(Sc_Macro_filter, group.by = "Condition", label = T, cols = pal)
 ```
 
 # saving data
-```{r}
+```{r, eval = FALSE}
 saveRDS(Sc_Macro_filter,"Sc_Macro_filter.rds")
 ```
 
