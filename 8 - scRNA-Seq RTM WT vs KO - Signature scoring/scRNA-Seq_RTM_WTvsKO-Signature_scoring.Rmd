@@ -1,0 +1,684 @@
+---
+title: "scRNA-Seq RTM WT vs KO - Signature scoring"
+author: "Domien Vanneste"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  header-includes: "-| ```{=latex} \\usepackage{fvextra} \\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+    breaksymbolleft={}, showspaces = false, showtabs = false, breaklines, commandchars=\\\\\\{\\}
+    } ```"
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+# Introduction
+
+To objectively examine the effects of MafB deficiency on global and subset-specific mac identity, we used the global mac signature score generated above and created RTM subset-specific scores based on the DEGs of each RTM subset compared to other RTM in our scRNA-seq data. Interestingly, global mac signature scores were all significantly lower in Mafb-deficient RTMs as compared to their wild-type counterparts, except for MHC-II+ CM. Moreover, we found that each RTM subsets from Lyz2CreMafbfl/fl mice, except for SPM and IM, exhibited a significantly lower score for RTM-subset specific signatures as compared to their wild-type controls. Fourth, we mapped the monocyte signature and found that all Mafb-deficient RTM, except Ly6C+ CM, exhibited a significantly higher monocyte score as compared to wild-type RTM. These findings collectively support a profound disruption in global mac and RTM subset-specific identities in the absence of MafB in vivo, as well as a monocyte signature suggestive of immaturity and incomplete differentiation.
+
+# Load packages
+
+```{r}
+suppressMessages({
+library(Seurat)
+library(SeuratObject)
+library(limma)
+library(ggplot2)
+library(RColorBrewer)
+library(dplyr)
+library(readxl)
+})
+```
+
+# Load Seurat object
+
+```{r}
+sc <- readRDS("sc.rds")
+
+pal <-c("#6A3D9A", "#CAB2D6", "#E31A1C", "#FB9A99", "#33A02C", "#B2DF8A", "#1F78B4", "#A6CEE3", "#FF7F00", "#FDBF6F", "#FF00FA", "#FFA1FD", "#87421F", "#CDAA7D")
+
+DimPlot(sc, cols = pal)
+```
+
+# Signature scoring
+
+## Macrophage signature score
+
+```{r}
+MacvscMo <- read.csv("Mac_sign.csv", header = T)
+
+Mac.genes <- list(MacvscMo$Gene_Symbol)
+
+sc <- AddModuleScore(sc, features = Mac.genes, name = 'Scoring_Macro')
+
+VlnPlot(sc, features = "Scoring_Macro1", cols = pal, pt.size = 0)
+```
+
+### SPM
+
+```{r fig.height=4, fig.width=2.5}
+pal_SPM <- c("#6A3D9A", "#CAB2D6")
+
+VlnPlot(sc, features = "Scoring_Macro1", cols = pal_SPM, pt.size = 0, idents = c("SPM WT", "SPM KO"))+ggtitle("SPM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+metadata <- sc@meta.data
+SPM_WT <- metadata[metadata$Condition == "SPM WT",]
+SPM_KO <- metadata[metadata$Condition == "SPM KO",]
+
+wilcox.test(SPM_WT$Scoring_Macro1, SPM_KO$Scoring_Macro1) #2.154e-07
+```
+
+### LPM
+
+```{r fig.height=4, fig.width=2.5}
+pal_LPM <-c("#e31a1c", "#fb9a99")
+
+VlnPlot(sc, features = "Scoring_Macro1", cols = pal_LPM, pt.size = 0, idents = c("LPM WT", "LPM KO"))+ggtitle("LPM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+LPM_WT <- metadata[metadata$Condition == "LPM WT",]
+LPM_KO <- metadata[metadata$Condition == "LPM KO",]
+
+wilcox.test(LPM_WT$Scoring_Macro1, LPM_KO$Scoring_Macro1) #< 2.2e-16
+```
+
+### KC
+
+```{r fig.height=4, fig.width=2.5}
+pal_KC <- c("#33a02c", "#b2df8a")
+
+VlnPlot(sc, features = "Scoring_Macro1", cols = pal_KC, pt.size = 0, idents = c("KC WT", "KC KO"))+ggtitle("KC")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+KC_WT <- metadata[metadata$Condition == "KC WT",]
+KC_KO <- metadata[metadata$Condition == "KC KO",]
+
+wilcox.test(KC_WT$Scoring_Macro1, KC_KO$Scoring_Macro1) #< 2.2e-16
+```
+
+### IM
+
+```{r fig.height=4, fig.width=2.5}
+pal_IM <- c("#1f78b4", "#a6cee3")
+
+VlnPlot(sc, features = "Scoring_Macro1", cols = pal_IM, pt.size = 0, idents = c("IM WT", "IM KO"))+ggtitle("IM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+IM_WT <- metadata[metadata$Condition == "IM WT",]
+IM_KO <- metadata[metadata$Condition == "IM KO",]
+
+wilcox.test(IM_WT$Scoring_Macro1, IM_KO$Scoring_Macro1) #< 2.2e-16
+```
+
+### Ly6C+ CM
+
+```{r fig.height=4, fig.width=2.5}
+pal_Ly6C <- c("#FF7F00", "#FDBF6F")
+
+VlnPlot(sc, features = "Scoring_Macro1", cols = pal_Ly6C, pt.size = 0, idents = c("Ly6C+ CM WT", "Ly6C+ CM KO"))+ggtitle("Ly6C+ CM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+Ly6C_WT <- metadata[metadata$Condition == "Ly6C+ CM WT",]
+Ly6C_KO <- metadata[metadata$Condition == "Ly6C+ CM KO",]
+
+wilcox.test(Ly6C_WT$Scoring_Macro1, Ly6C_KO$Scoring_Macro1) #0.02762
+```
+
+MHC-II+ CM
+
+```{r fig.height=4, fig.width=2.5}
+pal_MHC2 <- c("#FF00FA", "#FFA1FD")
+
+VlnPlot(sc, features = "Scoring_Macro1", cols = pal_MHC2, pt.size = 0, idents = c("MHC2+ CM WT", "MHC2+ CM KO"))+ggtitle("MHC-II+ CM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+MHC2_WT <- metadata[metadata$Condition == "MHC2+ CM WT",]
+MHC2_KO <- metadata[metadata$Condition == "MHC2+ CM KO",]
+
+wilcox.test(MHC2_WT$Scoring_Macro1, MHC2_KO$Scoring_Macro1) #0.1286
+```
+
+### MG
+
+```{r fig.height=4, fig.width=2.5}
+pal_MG <- c("#87421F", "#CDAA7D")
+
+VlnPlot(sc, features = "Scoring_Macro1", cols = pal_MG, pt.size = 0, idents = c("MG WT", "MG KO"))+ggtitle("MG")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+MG_WT <- metadata[metadata$Condition == "MG WT",]
+MG_KO <- metadata[metadata$Condition == "MG KO",]
+
+wilcox.test(MG_WT$Scoring_Macro1, MG_KO$Scoring_Macro1) #< 2.2e-16
+```
+
+## RTM subset specific signature score
+
+```{r}
+wt <- subset(sc, idents = c("SPM WT", "LPM WT", "KC WT", "IM WT", "Ly6C+ CM WT", "MHC2+ CM WT", "MG WT"))
+
+markers <- FindAllMarkers(wt, only.pos = TRUE)
+
+write.csv(markers, file = "markers.csv")
+```
+
+```{r}
+markers <- read.csv("markers.csv", header = T, row.names = 1)
+```
+
+### SPM
+
+```{r}
+SPM.markers <- filter(markers, cluster == "SPM WT")
+SPM.markers <- SPM.markers[SPM.markers$p_val_adj < 0.05 & abs(SPM.markers$avg_log2FC) > 0.25, ]
+SPM.markers <- SPM.markers[order(SPM.markers$avg_log2FC, decreasing = TRUE), ]
+SPM.markers.top100 <- head(SPM.markers$gene,100)
+
+write.table(SPM.markers.top100, file = "SPM_sign.txt")
+
+SPM.markers.top100 <- list(SPM.markers.top100)
+
+
+sc <- AddModuleScore(sc, features = SPM.markers.top100, name = 'SPM_sign')
+```
+
+```{r fig.height=4, fig.width=12,5}
+VlnPlot(sc, features = "SPM_sign1", cols = pal, pt.size = 0)+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("")
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "SPM_sign1", cols = pal_SPM, pt.size = 0, idents=c("SPM WT", "SPM KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("SPM")
+```
+
+```{r}
+metadata <- sc@meta.data
+SPM_WT <- metadata[metadata$Condition == "SPM WT",]
+SPM_KO <- metadata[metadata$Condition == "SPM KO",]
+
+wilcox.test(SPM_WT$SPM_sign1, SPM_KO$SPM_sign1) #0.03641
+```
+
+### LPM
+
+```{r}
+LPM.markers <- filter(markers, cluster == "LPM WT")
+LPM.markers <- LPM.markers[LPM.markers$p_val_adj < 0.05 & abs(LPM.markers$avg_log2FC) > 0.25, ]
+LPM.markers <- LPM.markers[order(LPM.markers$avg_log2FC, decreasing = TRUE), ]
+LPM.markers.top100 <- head(LPM.markers$gene,100)
+
+write.table(LPM.markers.top100, file = "LPM_sign.txt")
+
+LPM.markers.top100 <- list(LPM.markers.top100)
+
+
+sc <- AddModuleScore(sc, features = LPM.markers.top100, name = 'LPM_sign')
+```
+
+```{r fig.height=4, fig.width=12.5}
+VlnPlot(sc, features = "LPM_sign1", cols = pal, pt.size = 0)+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("")
+```
+
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "LPM_sign1", cols = pal_LPM, pt.size = 0, idents=c("LPM WT", "LPM KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("LPM")
+```
+
+```{r}
+metadata <- sc@meta.data
+LPM_WT <- metadata[metadata$Condition == "LPM WT",]
+LPM_KO <- metadata[metadata$Condition == "LPM KO",]
+
+wilcox.test(LPM_WT$LPM_sign1, LPM_KO$LPM_sign1) #< 2.2e-16
+```
+
+### KC
+
+```{r}
+KC.markers <- filter(markers, cluster == "KC WT")
+KC.markers <- KC.markers[KC.markers$p_val_adj < 0.05 & abs(KC.markers$avg_log2FC) > 0.25, ]
+KC.markers <- KC.markers[order(KC.markers$avg_log2FC, decreasing = TRUE), ]
+KC.markers.top100 <- head(KC.markers$gene,100)
+
+write.table(KC.markers.top100, file = "KC_sign.txt")
+
+KC.markers.top100 <- list(KC.markers.top100)
+
+
+sc <- AddModuleScore(sc, features = KC.markers.top100, name = 'KC_sign')
+```
+
+```{r fig.height=4, fig.width=12.5}
+VlnPlot(sc, features = "KC_sign1", cols = pal, pt.size = 0)+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("")
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "KC_sign1", cols = pal_KC, pt.size = 0, idents=c("KC WT", "KC KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("KC")
+```
+
+```{r}
+metadata <- sc@meta.data
+KC_WT <- metadata[metadata$Condition == "KC WT",]
+KC_KO <- metadata[metadata$Condition == "KC KO",]
+
+wilcox.test(KC_WT$KC_sign1, KC_KO$KC_sign1) #< 2.2e-16
+```
+
+### IM
+
+```{r}
+IM.markers <- filter(markers, cluster == "IM WT")
+IM.markers <- IM.markers[IM.markers$p_val_adj < 0.05 & abs(IM.markers$avg_log2FC) > 0.25, ]
+IM.markers <- IM.markers[order(IM.markers$avg_log2FC, decreasing = TRUE), ]
+IM.markers.top100 <- head(IM.markers$gene,100)
+
+write.table(IM.markers.top100, file = "IM_sign.txt")
+
+IM.markers.top100 <- list(IM.markers.top100)
+
+
+sc <- AddModuleScore(sc, features = IM.markers.top100, name = 'IM_sign')
+```
+
+```{r fig.height=4, fig.width=12.5}
+VlnPlot(sc, features = "IM_sign1", cols = pal, pt.size = 0)+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("")
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "IM_sign1", cols = pal_IM, pt.size = 0, idents=c("IM WT", "IM KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("IM")
+```
+
+```{r}
+metadata <- sc@meta.data
+IM_WT <- metadata[metadata$Condition == "IM WT",]
+IM_KO <- metadata[metadata$Condition == "IM KO",]
+
+wilcox.test(IM_WT$IM_sign1, IM_KO$IM_sign1) #0.1182
+```
+
+### Ly6C+ CM
+
+```{r}
+Ly6C.markers <- filter(markers, cluster == "Ly6C+ CM WT")
+Ly6C.markers <- Ly6C.markers[Ly6C.markers$p_val_adj < 0.05 & abs(Ly6C.markers$avg_log2FC) > 0.25, ]
+Ly6C.markers <- Ly6C.markers[order(Ly6C.markers$avg_log2FC, decreasing = TRUE), ]
+Ly6C.markers.top100 <- head(Ly6C.markers$gene,100)
+
+write.table(Ly6C.markers.top100, file = "Ly6C_sign.txt")
+
+Ly6C.markers.top100 <- list(Ly6C.markers.top100)
+
+
+sc <- AddModuleScore(sc, features = Ly6C.markers.top100, name = 'Ly6C_sign')
+```
+
+```{r fig.height=4, fig.width=12.5}
+VlnPlot(sc, features = "Ly6C_sign1", cols = pal, pt.size = 0)+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("")
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "Ly6C_sign1", cols = pal_Ly6C, pt.size = 0, idents=c("Ly6C+ CM WT", "Ly6C+ CM KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("Ly6C+ CM")
+```
+
+```{r}
+metadata <- sc@meta.data
+Ly6C_CM_WT <- metadata[metadata$Condition == "Ly6C+ CM WT",]
+Ly6C_CM_KO <- metadata[metadata$Condition == "Ly6C+ CM KO",]
+
+wilcox.test(Ly6C_CM_WT$Ly6C_sign1, Ly6C_CM_KO$Ly6C_sign1) #< 2.2e-16
+```
+
+### MHC-II+ CM
+
+```{r}
+MHC2.markers <- filter(markers, cluster == "MHC2+ CM WT")
+MHC2.markers <- MHC2.markers[MHC2.markers$p_val_adj < 0.05 & abs(MHC2.markers$avg_log2FC) > 0.25, ]
+MHC2.markers <- MHC2.markers[order(MHC2.markers$avg_log2FC, decreasing = TRUE), ]
+MHC2.markers.top100 <- head(MHC2.markers$gene,100)
+
+write.table(MHC2.markers.top100, file = "MHC2_sign.txt")
+
+MHC2.markers.top100 <- list(MHC2.markers.top100)
+
+
+sc <- AddModuleScore(sc, features = MHC2.markers.top100, name = 'MHC2_sign')
+```
+
+```{r fig.height=4, fig.width=12.5}
+VlnPlot(sc, features = "MHC2_sign1", cols = pal, pt.size = 0)+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("")
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "MHC2_sign1", cols = pal_MHC2, pt.size = 0, idents=c("MHC2+ CM WT", "MHC2+ CM KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("MHC-II+ CM")
+```
+
+```{r}
+metadata <- sc@meta.data
+MHC2_CM_WT <- metadata[metadata$Condition == "MHC2+ CM WT",]
+MHC2_CM_KO <- metadata[metadata$Condition == "MHC2+ CM KO",]
+
+wilcox.test(MHC2_CM_WT$MHC2_sign1, MHC2_CM_KO$MHC2_sign1) #2.388e-09
+```
+
+### MG
+
+```{r fig.height=4, fig.width=10}
+MG.markers <- filter(markers, cluster == "MG WT")
+MG.markers <- MG.markers[MG.markers$p_val_adj < 0.05 & abs(MG.markers$avg_log2FC) > 0.25, ]
+MG.markers <- MG.markers[order(MG.markers$avg_log2FC, decreasing = TRUE), ]
+MG.markers.top100 <- head(MG.markers$gene,100)
+
+write.table(MG.markers.top100, file = "MG_sign.txt")
+
+MG.markers.top100 <- list(MG.markers.top100)
+
+
+sc <- AddModuleScore(sc, features = MG.markers.top100, name = 'MG_sign')
+```
+
+```{r fig.height=4, fig.width=12.5}
+VlnPlot(sc, features = "MG_sign1", cols = pal, pt.size = 0)+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("")
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "MG_sign1", cols = pal_MG, pt.size = 0, idents=c("MG WT", "MG KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("MG")
+```
+
+```{r}
+metadata <- sc@meta.data
+MG_WT <- metadata[metadata$Condition == "MG WT",]
+MG_KO <- metadata[metadata$Condition == "MG KO",]
+
+wilcox.test(MG_WT$MG_sign1, MG_KO$MG_sign1) #< 2.2e-16
+```
+
+
+## Monocyte signature score
+
+```{r}
+cMovsMac <- read.csv("Mo_sign.csv", header = T)
+
+cMo.genes <- list(cMovsMac$Gene_Symbol)
+
+sc <- AddModuleScore(sc, features = cMo.genes, name = 'Scoring_Mono')
+
+VlnPlot(sc, features = "Scoring_Mono1", cols = pal, pt.size = 0)
+```
+
+### SPM
+
+```{r fig.height=4, fig.width=2.5}
+pal_SPM <- c("#6A3D9A", "#CAB2D6")
+
+VlnPlot(sc, features = "Scoring_Mono1", cols = pal_SPM, pt.size = 0, idents = c("SPM WT", "SPM KO"))+ggtitle("SPM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+metadata <- sc@meta.data
+SPM_WT <- metadata[metadata$Condition == "SPM WT",]
+SPM_KO <- metadata[metadata$Condition == "SPM KO",]
+
+wilcox.test(SPM_WT$Scoring_Mono1, SPM_KO$Scoring_Mono1) #1.307e-14
+```
+
+### LPM
+
+```{r fig.height=4, fig.width=2.5}
+pal_LPM <-c("#e31a1c", "#fb9a99")
+
+VlnPlot(sc, features = "Scoring_Mono1", cols = pal_LPM, pt.size = 0, idents = c("LPM WT", "LPM KO"))+ggtitle("LPM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+LPM_WT <- metadata[metadata$Condition == "LPM WT",]
+LPM_KO <- metadata[metadata$Condition == "LPM KO",]
+
+wilcox.test(LPM_WT$Scoring_Mono1, LPM_KO$Scoring_Mono1) #< 2.2e-16
+```
+
+### KC
+
+```{r fig.height=4, fig.width=2.5}
+pal_KC <- c("#33a02c", "#b2df8a")
+
+VlnPlot(sc, features = "Scoring_Mono1", cols = pal_KC, pt.size = 0, idents = c("KC WT", "KC KO"))+ggtitle("KC")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+KC_WT <- metadata[metadata$Condition == "KC WT",]
+KC_KO <- metadata[metadata$Condition == "KC KO",]
+
+wilcox.test(KC_WT$Scoring_Mono1, KC_KO$Scoring_Mono1) #< 2.2e-16
+```
+
+### IM
+
+```{r fig.height=4, fig.width=2.5}
+pal_IM <- c("#1f78b4", "#a6cee3")
+
+VlnPlot(sc, features = "Scoring_Mono1", cols = pal_IM, pt.size = 0, idents = c("IM WT", "IM KO"))+ggtitle("IM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+IM_WT <- metadata[metadata$Condition == "IM WT",]
+IM_KO <- metadata[metadata$Condition == "IM KO",]
+
+wilcox.test(IM_WT$Scoring_Mono1, IM_KO$Scoring_Mono1) #< 2.2e-16
+```
+
+### Ly6C+ CM
+
+```{r fig.height=4, fig.width=2.5}
+pal_Ly6C <- c("#FF7F00", "#FDBF6F")
+
+VlnPlot(sc, features = "Scoring_Mono1", cols = pal_Ly6C, pt.size = 0, idents = c("Ly6C+ CM WT", "Ly6C+ CM KO"))+ggtitle("Ly6C+ CM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+Ly6C_WT <- metadata[metadata$Condition == "Ly6C+ CM WT",]
+Ly6C_KO <- metadata[metadata$Condition == "Ly6C+ CM KO",]
+
+wilcox.test(Ly6C_WT$Scoring_Mono1, Ly6C_KO$Scoring_Mono1) #1.205e-14
+```
+
+### MHC-II+ CM
+
+```{r fig.height=4, fig.width=2.5}
+pal_MHC2 <- c("#FF00FA", "#FFA1FD")
+
+VlnPlot(sc, features = "Scoring_Mono1", cols = pal_MHC2, pt.size = 0, idents = c("MHC2+ CM WT", "MHC2+ CM KO"))+ggtitle("MHC-II+ CM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+MHC2_WT <- metadata[metadata$Condition == "MHC2+ CM WT",]
+MHC2_KO <- metadata[metadata$Condition == "MHC2+ CM KO",]
+
+wilcox.test(MHC2_WT$Scoring_Mono1, MHC2_KO$Scoring_Mono1) #0.0005466
+```
+
+### MG
+
+```{r fig.height=4, fig.width=2.5}
+pal_MG <- c("#87421F", "#CDAA7D")
+
+VlnPlot(sc, features = "Scoring_Mono1", cols = pal_MG, pt.size = 0, idents = c("MG WT", "MG KO"))+ggtitle("MG")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+MG_WT <- metadata[metadata$Condition == "MG WT",]
+MG_KO <- metadata[metadata$Condition == "MG KO",]
+
+wilcox.test(MG_WT$Scoring_Mono1, MG_KO$Scoring_Mono1) #< 2.2e-16
+```
+
+## Embrionically dervived mac and Monocyte dervived mac signature score
+
+### KC
+
+```{r}
+Microarray_KC_EMvsMo <- read_excel("Microarray_KC_EMvsMo.xlsx")
+Microarray_KC_EMvsMo <- na.omit(Microarray_KC_EMvsMo)
+Microarray_KC_EMvsMo <- Microarray_KC_EMvsMo[Microarray_KC_EMvsMo$adj.P.Val < 0.05 & abs(Microarray_KC_EMvsMo$logFC) > 1, ]
+
+write.csv(Microarray_KC_EMvsMo, file = "Microarray_KC_EMvsMo.csv")
+
+EM_KC_sign <- Microarray_KC_EMvsMo[Microarray_KC_EMvsMo$logFC > 1, ]$Gene.symbol
+
+EM_KC_sign <- list(EM_KC_sign)
+
+sc <- AddModuleScore(sc, features = EM_KC_sign, name = 'EM_KC_sign')
+
+Mo_KC_sign <- Microarray_KC_EMvsMo[Microarray_KC_EMvsMo$logFC < -1, ]$Gene.symbol
+
+Mo_KC_sign <- list(Mo_KC_sign)
+
+sc <- AddModuleScore(sc, features = Mo_KC_sign, name = 'Mo_KC_sign')
+
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "EM_KC_sign1", cols = pal_KC, pt.size = 0, idents=c("KC WT", "KC KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("KC")
+```
+
+```{r}
+metadata <- sc@meta.data
+KC_WT <- metadata[metadata$Condition == "KC WT",]
+KC_KO <- metadata[metadata$Condition == "KC KO",]
+
+wilcox.test(KC_WT$EM_KC_sign1, KC_KO$EM_KC_sign1) #< 2.2e-16
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "Mo_KC_sign1", cols = pal_KC, pt.size = 0, idents=c("KC WT", "KC KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("KC")
+```
+
+```{r}
+wilcox.test(KC_WT$Mo_KC_sign1, KC_KO$Mo_KC_sign1) #P= 1.116e-10
+```
+
+### IM
+
+```{r}
+Bulk_RNAseq_IM_EMvsMo <- read_excel("Bulk_RNAseq_IM_EMvsMo.xlsx")
+
+Bulk_RNAseq_IM_EMvsMo <- Bulk_RNAseq_IM_EMvsMo[Bulk_RNAseq_IM_EMvsMo$padj.y < 0.05 & abs(Bulk_RNAseq_IM_EMvsMo$log2FoldChange.y) > 1, ]
+
+write.csv(Bulk_RNAseq_IM_EMvsMo, file = "Bulk_RNAseq_IM_EMvsMo.csv")
+
+EM_IM_sign <- Bulk_RNAseq_IM_EMvsMo[Bulk_RNAseq_IM_EMvsMo$log2FoldChange.y < -1, ]$Gene
+
+EM_IM_sign <- list(EM_IM_sign)
+
+sc <- AddModuleScore(sc, features = EM_IM_sign, name = 'EM_IM_sign')
+
+Mo_IM_sign <- Bulk_RNAseq_IM_EMvsMo[Bulk_RNAseq_IM_EMvsMo$log2FoldChange.y > 1, ]$Gene
+
+Mo_IM_sign <- list(Mo_IM_sign)
+
+sc <- AddModuleScore(sc, features = Mo_IM_sign, name = 'Mo_IM_sign')
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "EM_IM_sign1", cols = pal_IM, pt.size = 0, idents=c("IM WT", "IM KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("IM")
+```
+
+```{r}
+metadata <- sc@meta.data
+IM_WT <- metadata[metadata$Condition == "IM WT",]
+IM_KO <- metadata[metadata$Condition == "IM KO",]
+
+wilcox.test(IM_WT$EM_IM_sign1, IM_KO$EM_IM_sign1) #< 2.2e-16
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "Mo_IM_sign1", cols = pal_IM, pt.size = 0, idents=c("IM WT", "IM KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("IM")
+```
+
+```{r}
+wilcox.test(IM_WT$Mo_IM_sign1, IM_KO$Mo_IM_sign1) #< 2.2e-16
+```
+
+### MG
+
+```{r}
+Bulk_RNAseq_MG_EMvsMo <- read_excel("Bulk_RNAseq_MG_EMvsMo.xlsx", na = 'NA')
+
+Bulk_RNAseq_MG_EMvsMo <- Bulk_RNAseq_MG_EMvsMo[Bulk_RNAseq_MG_EMvsMo$p.value.45.1.45.2.nt < 0.05 & abs(Bulk_RNAseq_MG_EMvsMo$FC.45.1.45.2.nt) > 1, ]
+
+Bulk_RNAseq_MG_EMvsMo$diff <- Bulk_RNAseq_MG_EMvsMo$average.45.1.nt - Bulk_RNAseq_MG_EMvsMo$average.45.2.nt
+
+EM_MG_sign <- Bulk_RNAseq_MG_EMvsMo[Bulk_RNAseq_MG_EMvsMo$diff < 0, ]$Gene.Name
+
+EM_MG_sign <- intersect(rownames(sc), EM_MG_sign)
+
+EM_MG_sign <- head(EM_MG_sign, 100)
+
+write.table(EM_MG_sign, file = "EM_MG_sign.txt")
+
+EM_MG_sign <- list(EM_MG_sign)
+
+sc <- AddModuleScore(sc, features = EM_MG_sign, name = 'EM_MG_sign')
+
+Mo_MG_sign <- Bulk_RNAseq_MG_EMvsMo[Bulk_RNAseq_MG_EMvsMo$diff > 0, ]$Gene.Name
+
+Mo_MG_sign <- intersect(rownames(sc), Mo_MG_sign)
+
+Mo_MG_sign <- head(Mo_MG_sign, 100)
+
+write.table(Mo_MG_sign, file = "Mo_MG_sign.txt")
+
+Mo_MG_sign <- list(Mo_MG_sign)
+
+sc <- AddModuleScore(sc, features = Mo_MG_sign, name = 'Mo_MG_sign')
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "EM_MG_sign1", cols = pal_MG, pt.size = 0, idents=c("MG WT", "MG KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("MG")
+```
+
+```{r}
+metadata <- sc@meta.data
+MG_WT <- metadata[metadata$Condition == "MG WT",]
+MG_KO <- metadata[metadata$Condition == "MG KO",]
+
+mean(MG_WT$EM_MG_sign1)
+mean(MG_KO$EM_MG_sign1)
+
+wilcox.test(MG_WT$EM_MG_sign1, MG_KO$EM_MG_sign1) #p-value = 4.694e-07
+```
+
+```{r fig.height=4, fig.width=2.5}
+VlnPlot(sc, features = "Mo_MG_sign1", cols = pal_MG, pt.size = 0, idents=c("MG WT", "MG KO"))+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("MG")
+```
+
+```{r}
+metadata <- sc@meta.data
+MG_WT <- metadata[metadata$Condition == "MG WT",]
+MG_KO <- metadata[metadata$Condition == "MG KO",]
+
+mean(MG_WT$Mo_MG_sign1)
+mean(MG_KO$Mo_MG_sign1)
+
+wilcox.test(MG_WT$Mo_MG_sign1, MG_KO$Mo_MG_sign1) #p-value = 0.02041
+```
+
+
+
+```{r}
+sessionInfo()
+```
+
