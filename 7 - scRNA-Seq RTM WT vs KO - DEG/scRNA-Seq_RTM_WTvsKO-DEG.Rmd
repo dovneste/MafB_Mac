@@ -1,0 +1,391 @@
+---
+title: "scRNA-Seq RTM WT vs KO - DEG"
+author: "Domien Vanneste"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  header-includes: "-| ```{=latex} \\usepackage{fvextra} \\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+    breaksymbolleft={}, showspaces = false, showtabs = false, breaklines, commandchars=\\\\\\{\\}
+    } ```"
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+# Introduction
+
+We conducted differential gene expression analysis between RTMs from Lyz2CreMafbfl/fl (KO) mice and Mafbfl/fl (WT) littermate controls and  identified 92 DEGs in SPM, 535 DEGs in LPM, 262 DEGs in KC, 287 DEGs in IM, 723 DEGs in Ly6C+ CM, 150 DEGs in MHC-II+ CM and 299 DEGs in MG. Of note, known RTM-specific identity genes such as Retnla for SPM, Vsig4 for LPM, CD163 for KC, and Fcrls for MG were significantly lower expressed in Mafb-deficient cells.
+
+# Load packages
+
+```{r}
+suppressMessages({
+library(Seurat)
+library(SeuratObject)
+library(ggplot2)
+library(RColorBrewer)
+library(dplyr)
+library(ggrepel)
+})
+```
+
+# Load Seurat object
+
+```{r}
+sc <- readRDS("sc.rds")
+
+pal <-c("#6a3d9a", "#cab2d6", "#e31a1c", "#fb9a99", "#33a02c", "#b2df8a", "#1f78b4", "#a6cee3", "#ff7f00", "#fdbf6f", "#ff00fa", "#ffa1fd", "#87421f", "#cdaa7d")
+
+DimPlot(sc, cols = pal)
+```
+
+# Differential gene expression analysis
+
+## SPM
+
+```{r}
+SPM_WTvsKO <- FindMarkers(sc, ident.1 = "SPM KO", ident.2 = "SPM WT", logfc.threshold = 0)
+write.csv(SPM_WTvsKO, file = "SPM_WTvsKO.csv")
+```
+
+```{r}
+SPM_WTvsKO <- read.csv("SPM_WTvsKO.csv", header = T, row.names = 1)
+SPM_WTvsKO.markers <- SPM_WTvsKO[SPM_WTvsKO$p_val_adj < 0.05 & abs(SPM_WTvsKO$avg_log2FC) > 0.25, ]
+SPM_WTvsKO.markers <- SPM_WTvsKO.markers[order(SPM_WTvsKO.markers$avg_log2FC, decreasing = TRUE), ]
+nrow(SPM_WTvsKO.markers)
+nrow(SPM_WTvsKO.markers[SPM_WTvsKO.markers$avg_log2FC>0, ])
+nrow(SPM_WTvsKO.markers[SPM_WTvsKO.markers$avg_log2FC<0, ])
+write.csv(SPM_WTvsKO.markers, file = "SPM_WTvsKO_markers.csv")
+```
+
+```{r fig.height=6, fig.width=5}
+threshold.log2fc <- 0.25
+threshold.adjp <- 0.05
+SPM_WTvsKO.volcano = mutate(SPM_WTvsKO, 
+ Sig=ifelse((abs(SPM_WTvsKO$avg_log2FC) > threshold.log2fc)&(SPM_WTvsKO$p_val_adj < threshold.adjp), "Sig", "n.s."))
+# add two colors to 2 sig lists
+SPM_WTvsKO.volcano$Sig [ SPM_WTvsKO.volcano$avg_log2FC < -threshold.log2fc & SPM_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "WT"
+
+SPM_WTvsKO.volcano$Sig [ SPM_WTvsKO.volcano$avg_log2FC > threshold.log2fc & SPM_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "KO"
+
+SPM_WTvsKO.volcano$Gene <- rownames(SPM_WTvsKO.volcano)
+Gene.to.show.ValcanoPlot <- rownames(SPM_WTvsKO.volcano[SPM_WTvsKO.volcano$Sig != "n.s.", ])
+
+axis.lim <- max(abs(SPM_WTvsKO.volcano$avg_log2FC)) + 1
+
+ggplot(SPM_WTvsKO.volcano, aes(avg_log2FC, -log10(p_val_adj))) + geom_point(aes(col=Sig)) + scale_color_manual(values=c( `WT`="#6a3d9a", `n.s.`="grey", `KO`="#cab2d6"))+ geom_hline(yintercept = -log10(threshold.adjp), linetype='dashed', col = 'grey')+ geom_vline(xintercept = c(-threshold.log2fc, threshold.log2fc),  linetype='dashed', col = 'grey')+ geom_text_repel(data=filter(SPM_WTvsKO.volcano, Gene %in% Gene.to.show.ValcanoPlot), size = 3, aes(label=Gene, fontface = "italic"), box.padding = 1) + theme_classic() + theme(legend.position="none")+ theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+```
+
+
+```{r fig.height=6, fig.width=4}
+SPM <- subset(sc, idents = c("SPM WT", "SPM KO"))
+all.genes <- rownames(SPM)
+SPM <- ScaleData(SPM, features = all.genes)
+pal_SPM <- c("#6a3d9a", "#cab2d6")
+
+DoHeatmap(SPM, features = rev(rownames(SPM_WTvsKO.markers)), group.colors = pal_SPM, size = 0) + scale_fill_gradientn(colors = c("blue", "white", "red")) +
+   theme(axis.text.y = element_text(size = 4))+ theme(legend.position = 'none')
+
+```
+
+## LPM
+
+```{r}
+LPM_WTvsKO <- FindMarkers(sc, ident.1 = "LPM KO", ident.2 = "LPM WT", logfc.threshold = 0)
+write.csv(LPM_WTvsKO, file = "LPM_WTvsKO.csv")
+```
+
+```{r}
+LPM_WTvsKO <- read.csv("LPM_WTvsKO.csv", header = T, row.names = 1)
+LPM_WTvsKO.markers <- LPM_WTvsKO[LPM_WTvsKO$p_val_adj < 0.05 & abs(LPM_WTvsKO$avg_log2FC) > 0.25, ]
+LPM_WTvsKO.markers <- LPM_WTvsKO.markers[order(LPM_WTvsKO.markers$avg_log2FC, decreasing = TRUE), ]
+nrow(LPM_WTvsKO.markers)
+nrow(LPM_WTvsKO.markers[LPM_WTvsKO.markers$avg_log2FC>0, ])
+nrow(LPM_WTvsKO.markers[LPM_WTvsKO.markers$avg_log2FC<0, ])
+write.csv(LPM_WTvsKO.markers, file = "LPM_WTvsKO_markers.csv")
+```
+
+```{r fig.height=6, fig.width=5}
+threshold.log2fc <- 0.25
+threshold.adjp <- 0.05
+LPM_WTvsKO.volcano = mutate(LPM_WTvsKO, 
+ Sig=ifelse((abs(LPM_WTvsKO$avg_log2FC) > threshold.log2fc)&(LPM_WTvsKO$p_val_adj < threshold.adjp), "Sig", "n.s."))
+# add two colors to 2 sig lists
+LPM_WTvsKO.volcano$Sig [ LPM_WTvsKO.volcano$avg_log2FC < -threshold.log2fc & LPM_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "WT"
+
+LPM_WTvsKO.volcano$Sig [ LPM_WTvsKO.volcano$avg_log2FC > threshold.log2fc & LPM_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "KO"
+
+LPM_WTvsKO.volcano$Gene <- rownames(LPM_WTvsKO.volcano)
+
+Gene.to.show.ValcanoPlot <- rownames(LPM_WTvsKO.volcano[LPM_WTvsKO.volcano$Sig != "n.s.", ])
+
+axis.lim <- max(abs(SPM_WTvsKO.volcano$avg_log2FC)) + 1
+
+ggplot(LPM_WTvsKO.volcano, aes(avg_log2FC, -log10(p_val_adj))) + geom_point(aes(col=Sig)) + scale_color_manual(values=c( `WT`="#e31a1c", `n.s.`="grey", `KO`="#fb9a99"))+ geom_hline(yintercept = -log10(threshold.adjp), linetype='dashed', col = 'grey')+ geom_vline(xintercept = c(-threshold.log2fc, threshold.log2fc),  linetype='dashed', col = 'grey')+ geom_text_repel(data=filter(LPM_WTvsKO.volcano, Gene %in% Gene.to.show.ValcanoPlot), size = 2, aes(label=Gene, fontface = "italic"), box.padding = 1) + theme_classic() + theme(legend.position="none")+ theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+```
+
+```{r fig.height=6, fig.width=4}
+LPM <- subset(sc, idents = c("LPM WT", "LPM KO"))
+all.genes <- rownames(LPM)
+LPM <- ScaleData(LPM, features = all.genes)
+pal_LPM <-c("#e31a1c", "#fb9a99")
+
+DoHeatmap(LPM, features = rev(rownames(LPM_WTvsKO.markers)), group.colors = pal_LPM, size = 0) + scale_fill_gradientn(colors = c("blue", "white", "red")) +
+   theme(axis.text.y = element_text(size = 4))+ theme(legend.position = 'none')
+
+```
+
+## KC
+
+```{r}
+KC_WTvsKO <- FindMarkers(sc, ident.1 = "KC KO", ident.2 = "KC WT", logfc.threshold = 0)
+write.csv(KC_WTvsKO, file = "KC_WTvsKO.csv")
+```
+
+```{r}
+KC_WTvsKO <- read.csv("KC_WTvsKO.csv", header = T, row.names = 1)
+KC_WTvsKO.markers <- KC_WTvsKO[KC_WTvsKO$p_val_adj < 0.05 & abs(KC_WTvsKO$avg_log2FC) > 0.25, ]
+KC_WTvsKO.markers <- KC_WTvsKO.markers[order(KC_WTvsKO.markers$avg_log2FC, decreasing = TRUE), ]
+nrow(KC_WTvsKO.markers)
+nrow(KC_WTvsKO.markers[KC_WTvsKO.markers$avg_log2FC>0, ])
+nrow(KC_WTvsKO.markers[KC_WTvsKO.markers$avg_log2FC<0, ])
+write.csv(KC_WTvsKO.markers, file = "KC_WTvsKO_markers.csv")
+```
+
+```{r fig.height=6, fig.width=5}
+threshold.log2fc <- 0.25
+threshold.adjp <- 0.05
+KC_WTvsKO.volcano = mutate(KC_WTvsKO, 
+ Sig=ifelse((abs(KC_WTvsKO$avg_log2FC) > threshold.log2fc)&(KC_WTvsKO$p_val_adj < threshold.adjp), "Sig", "n.s."))
+# add two colors to 2 sig lists
+KC_WTvsKO.volcano$Sig [ KC_WTvsKO.volcano$avg_log2FC < -threshold.log2fc & KC_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "WT"
+
+KC_WTvsKO.volcano$Sig [ KC_WTvsKO.volcano$avg_log2FC > threshold.log2fc & KC_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "KO"
+
+KC_WTvsKO.volcano$Gene <- rownames(KC_WTvsKO.volcano)
+
+Gene.to.show.ValcanoPlot <- rownames(KC_WTvsKO.volcano[KC_WTvsKO.volcano$Sig != "n.s.", ])
+
+axis.lim <- max(abs(SPM_WTvsKO.volcano$avg_log2FC)) + 1
+
+ggplot(KC_WTvsKO.volcano, aes(avg_log2FC, -log10(p_val_adj))) + geom_point(aes(col=Sig)) + scale_color_manual(values=c( `WT`="#33a02c", `n.s.`="grey", `KO`="#b2df8a"))+ geom_hline(yintercept = -log10(threshold.adjp), linetype='dashed', col = 'grey')+ geom_vline(xintercept = c(-threshold.log2fc, threshold.log2fc),  linetype='dashed', col = 'grey')+ geom_text_repel(data=filter(KC_WTvsKO.volcano, Gene %in% Gene.to.show.ValcanoPlot), size = 2, aes(label=Gene, fontface = "italic"), box.padding = 1) + theme_classic() + theme(legend.position="none")+ theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+```
+
+```{r fig.height=6, fig.width=4}
+KC <- subset(sc, idents = c("KC WT", "KC KO"))
+all.genes <- rownames(KC)
+KC <- ScaleData(KC, features = all.genes)
+pal_KC <-c("#33a02c", "#b2df8a")
+
+DoHeatmap(KC, features = rev(rownames(KC_WTvsKO.markers)), group.colors = pal_KC, size = 0) + scale_fill_gradientn(colors = c("blue", "white", "red")) +
+   theme(axis.text.y = element_text(size = 4))+ theme(legend.position = 'none')
+
+```
+
+## IM
+
+```{r}
+IM_WTvsKO <- FindMarkers(sc, ident.1 = "IM KO", ident.2 = "IM WT", logfc.threshold = 0)
+write.csv(IM_WTvsKO, file = "IM_WTvsKO.csv")
+```
+
+```{r}
+IM_WTvsKO <- read.csv("IM_WTvsKO.csv", header = T, row.names = 1)
+IM_WTvsKO.markers <- IM_WTvsKO[IM_WTvsKO$p_val_adj < 0.05 & abs(IM_WTvsKO$avg_log2FC) > 0.25, ]
+IM_WTvsKO.markers <- IM_WTvsKO.markers[order(IM_WTvsKO.markers$avg_log2FC, decreasing = TRUE), ]
+nrow(IM_WTvsKO.markers)
+nrow(IM_WTvsKO.markers[IM_WTvsKO.markers$avg_log2FC>0, ])
+nrow(IM_WTvsKO.markers[IM_WTvsKO.markers$avg_log2FC<0, ])
+write.csv(IM_WTvsKO.markers, file = "IM_WTvsKO_markers.csv")
+```
+
+```{r fig.height=6, fig.width=5}
+threshold.log2fc <- 0.25
+threshold.adjp <- 0.05
+IM_WTvsKO.volcano = mutate(IM_WTvsKO, 
+ Sig=ifelse((abs(IM_WTvsKO$avg_log2FC) > threshold.log2fc)&(IM_WTvsKO$p_val_adj < threshold.adjp), "Sig", "n.s."))
+# add two colors to 2 sig lists
+IM_WTvsKO.volcano$Sig [ IM_WTvsKO.volcano$avg_log2FC < -threshold.log2fc & IM_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "WT"
+
+IM_WTvsKO.volcano$Sig [ IM_WTvsKO.volcano$avg_log2FC > threshold.log2fc & IM_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "KO"
+
+IM_WTvsKO.volcano$Gene <- rownames(IM_WTvsKO.volcano)
+
+Gene.to.show.ValcanoPlot <- rownames(IM_WTvsKO.volcano[IM_WTvsKO.volcano$Sig != "n.s.", ])
+
+axis.lim <- max(abs(SPM_WTvsKO.volcano$avg_log2FC)) + 1
+
+ggplot(IM_WTvsKO.volcano, aes(avg_log2FC, -log10(p_val_adj))) + geom_point(aes(col=Sig)) + scale_color_manual(values=c( `WT`="#1f78b4", `n.s.`="grey", `KO`="#a6cee3"))+ geom_hline(yintercept = -log10(threshold.adjp), linetype='dashed', col = 'grey')+ geom_vline(xintercept = c(-threshold.log2fc, threshold.log2fc),  linetype='dashed', col = 'grey')+ geom_text_repel(data=filter(IM_WTvsKO.volcano, Gene %in% Gene.to.show.ValcanoPlot), size = 2, aes(label=Gene, fontface = "italic"), box.padding = 1) + theme_classic() + theme(legend.position="none")+ theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+```
+
+```{r fig.height=6, fig.width=4}
+IM <- subset(sc, idents = c("IM WT", "IM KO"))
+all.genes <- rownames(IM)
+IM <- ScaleData(IM, features = all.genes)
+pal_IM <-c("#1f78b4", "#a6cee3")
+
+DoHeatmap(IM, features = rev(rownames(IM_WTvsKO.markers)), group.colors = pal_IM, size = 0) + scale_fill_gradientn(colors = c("blue", "white", "red")) +
+   theme(axis.text.y = element_text(size = 4))+ theme(legend.position = 'none')
+
+```
+
+## Ly6C+ CM
+
+```{r}
+Ly6C_WTvsKO <- FindMarkers(sc, ident.1 = "Ly6C+ CM KO", ident.2 = "Ly6C+ CM WT", logfc.threshold = 0)
+write.csv(Ly6C_WTvsKO, file = "Ly6C_WTvsKO.csv")
+```
+
+```{r}
+Ly6C_WTvsKO <- read.csv("Ly6C_WTvsKO.csv", header = T, row.names = 1)
+Ly6C_WTvsKO.markers <- Ly6C_WTvsKO[Ly6C_WTvsKO$p_val_adj < 0.05 & abs(Ly6C_WTvsKO$avg_log2FC) > 0.25, ]
+Ly6C_WTvsKO.markers <- Ly6C_WTvsKO.markers[order(Ly6C_WTvsKO.markers$avg_log2FC, decreasing = TRUE), ]
+nrow(Ly6C_WTvsKO.markers)
+nrow(Ly6C_WTvsKO.markers[Ly6C_WTvsKO.markers$avg_log2FC>0, ])
+nrow(Ly6C_WTvsKO.markers[Ly6C_WTvsKO.markers$avg_log2FC<0, ])
+write.csv(Ly6C_WTvsKO.markers, file = "Ly6C_WTvsKO_markers.csv")
+```
+
+```{r fig.height=6, fig.width=5}
+threshold.log2fc <- 0.25
+threshold.adjp <- 0.05
+Ly6C_WTvsKO.volcano = mutate(Ly6C_WTvsKO, 
+ Sig=ifelse((abs(Ly6C_WTvsKO$avg_log2FC) > threshold.log2fc)&(Ly6C_WTvsKO$p_val_adj < threshold.adjp), "Sig", "n.s."))
+# add two colors to 2 sig lists
+Ly6C_WTvsKO.volcano$Sig [ Ly6C_WTvsKO.volcano$avg_log2FC < -threshold.log2fc & Ly6C_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "WT"
+
+Ly6C_WTvsKO.volcano$Sig [ Ly6C_WTvsKO.volcano$avg_log2FC > threshold.log2fc & Ly6C_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "KO"
+
+Ly6C_WTvsKO.volcano$Gene <- rownames(Ly6C_WTvsKO.volcano)
+
+Gene.to.show.ValcanoPlot <- rownames(Ly6C_WTvsKO.volcano[Ly6C_WTvsKO.volcano$Sig != "n.s.", ])
+
+axis.lim <- max(abs(SPM_WTvsKO.volcano$avg_log2FC)) + 1
+
+ggplot(Ly6C_WTvsKO.volcano, aes(avg_log2FC, -log10(p_val_adj))) + geom_point(aes(col=Sig)) + scale_color_manual(values=c( `WT`="#ff7f00", `n.s.`="grey", `KO`="#fdbf6f"))+ geom_hline(yintercept = -log10(threshold.adjp), linetype='dashed', col = 'grey')+ geom_vline(xintercept = c(-threshold.log2fc, threshold.log2fc),  linetype='dashed', col = 'grey')+ geom_text_repel(data=filter(Ly6C_WTvsKO.volcano, Gene %in% Gene.to.show.ValcanoPlot), size = 1, aes(label=Gene, fontface = "italic"), box.padding = 1) + theme_classic() + theme(legend.position="none")+ theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+```
+
+
+```{r fig.height=6, fig.width=4}
+Ly6C_colon <- subset(sc, idents = c("Ly6C+ CM WT", "Ly6C+ CM KO"))
+all.genes <- rownames(Ly6C_colon)
+Ly6C_colon <- ScaleData(Ly6C_colon, features = all.genes)
+pal_Ly6C_colon <-c("#ff7f00", "#fdbf6f")
+
+DoHeatmap(Ly6C_colon, features = rev(rownames(Ly6C_WTvsKO.markers)), group.colors = pal_Ly6C_colon, size = 0) + scale_fill_gradientn(colors = c("blue", "white", "red")) +
+   theme(axis.text.y = element_text(size = 4))+ theme(legend.position = 'none')
+
+```
+
+## MHC-II+ CM
+
+```{r}
+MHC2_WTvsKO <- FindMarkers(sc, ident.1 = "MHC2+ CM KO", ident.2 = "MHC2+ CM WT", logfc.threshold = 0)
+write.csv(MHC2_WTvsKO, file = "MHC2_WTvsKO.csv")
+```
+
+```{r}
+MHC2_WTvsKO <- read.csv("MHC2_WTvsKO.csv", header = T, row.names = 1)
+MHC2_WTvsKO.markers <- MHC2_WTvsKO[MHC2_WTvsKO$p_val_adj < 0.05 & abs(MHC2_WTvsKO$avg_log2FC) > 0.25, ]
+MHC2_WTvsKO.markers <- MHC2_WTvsKO.markers[order(MHC2_WTvsKO.markers$avg_log2FC, decreasing = TRUE), ]
+nrow(MHC2_WTvsKO.markers)
+nrow(MHC2_WTvsKO.markers[MHC2_WTvsKO.markers$avg_log2FC>0, ])
+nrow(MHC2_WTvsKO.markers[MHC2_WTvsKO.markers$avg_log2FC<0, ])
+write.csv(MHC2_WTvsKO.markers, file = "MHC2_WTvsKO_markers.csv")
+```
+
+```{r fig.height=6, fig.width=5}
+threshold.log2fc <- 0.25
+threshold.adjp <- 0.05
+MHC2_WTvsKO.volcano = mutate(MHC2_WTvsKO, 
+ Sig=ifelse((abs(MHC2_WTvsKO$avg_log2FC) > threshold.log2fc)&(MHC2_WTvsKO$p_val_adj < threshold.adjp), "Sig", "n.s."))
+# add two colors to 2 sig lists
+MHC2_WTvsKO.volcano$Sig [ MHC2_WTvsKO.volcano$avg_log2FC < -threshold.log2fc & MHC2_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "WT"
+
+MHC2_WTvsKO.volcano$Sig [ MHC2_WTvsKO.volcano$avg_log2FC > threshold.log2fc & MHC2_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "KO"
+
+MHC2_WTvsKO.volcano$Gene <- rownames(MHC2_WTvsKO.volcano)
+
+Gene.to.show.ValcanoPlot <- rownames(MHC2_WTvsKO.volcano[MHC2_WTvsKO.volcano$Sig != "n.s.", ])
+
+axis.lim <- max(abs(SPM_WTvsKO.volcano$avg_log2FC)) + 1
+
+ggplot(MHC2_WTvsKO.volcano, aes(avg_log2FC, -log10(p_val_adj))) + geom_point(aes(col=Sig)) + scale_color_manual(values=c( `WT`="#ff00fa", `n.s.`="grey", `KO`="#ffa1fd"))+ geom_hline(yintercept = -log10(threshold.adjp), linetype='dashed', col = 'grey')+ geom_vline(xintercept = c(-threshold.log2fc, threshold.log2fc),  linetype='dashed', col = 'grey')+ geom_text_repel(data=filter(MHC2_WTvsKO.volcano, Gene %in% Gene.to.show.ValcanoPlot), size = 1, aes(label=Gene, fontface = "italic"), box.padding = 1, max.overlaps = 30) + theme_classic() + theme(legend.position="none")+ theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+```
+
+```{r fig.height=6, fig.width=4}
+MHC2_colon <- subset(sc, idents = c("MHC2+ CM WT", "MHC2+ CM KO"))
+all.genes <- rownames(MHC2_colon)
+MHC2_colon <- ScaleData(MHC2_colon, features = all.genes)
+pal_MHC2_colon <-c("#ff00fa", "#ffa1fd")
+
+DoHeatmap(MHC2_colon, features = rev(rownames(MHC2_WTvsKO.markers)), group.colors = pal_MHC2_colon, size = 0) + scale_fill_gradientn(colors = c("blue", "white", "red")) +
+   theme(axis.text.y = element_text(size = 4))+ theme(legend.position = 'none')
+
+```
+
+## MG
+
+```{r}
+MG_WTvsKO <- FindMarkers(sc, ident.1 = "MG KO", ident.2 = "MG WT", logfc.threshold = 0)
+write.csv(MG_WTvsKO, file = "MG_WTvsKO.csv")
+```
+
+```{r}
+MG_WTvsKO <- read.csv("MG_WTvsKO.csv", header = T, row.names = 1)
+MG_WTvsKO.markers <- MG_WTvsKO[MG_WTvsKO$p_val_adj < 0.05 & abs(MG_WTvsKO$avg_log2FC) > 0.25, ]
+MG_WTvsKO.markers <- MG_WTvsKO.markers[order(MG_WTvsKO.markers$avg_log2FC, decreasing = TRUE), ]
+nrow(MG_WTvsKO.markers)
+nrow(MG_WTvsKO.markers[MG_WTvsKO.markers$avg_log2FC>0, ])
+nrow(MG_WTvsKO.markers[MG_WTvsKO.markers$avg_log2FC<0, ])
+write.csv(MG_WTvsKO.markers, file = "MG_WTvsKO_markers.csv")
+```
+
+```{r fig.height=6, fig.width=5}
+threshold.log2fc <- 0.25
+threshold.adjp <- 0.05
+MG_WTvsKO.volcano = mutate(MG_WTvsKO, 
+ Sig=ifelse((abs(MG_WTvsKO$avg_log2FC) > threshold.log2fc)&(MG_WTvsKO$p_val_adj < threshold.adjp), "Sig", "n.s."))
+# add two colors to 2 sig lists
+MG_WTvsKO.volcano$Sig [ MG_WTvsKO.volcano$avg_log2FC < -threshold.log2fc & MG_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "WT"
+
+MG_WTvsKO.volcano$Sig [ MG_WTvsKO.volcano$avg_log2FC > threshold.log2fc & MG_WTvsKO.volcano$p_val_adj < threshold.adjp ] <- "KO"
+
+MG_WTvsKO.volcano$Gene <- rownames(MG_WTvsKO.volcano)
+
+Gene.to.show.ValcanoPlot <- rownames(MG_WTvsKO.volcano[MG_WTvsKO.volcano$Sig != "n.s.", ])
+
+axis.lim <- max(abs(MG_WTvsKO.volcano$avg_log2FC)) + 1
+
+ggplot(MG_WTvsKO.volcano, aes(avg_log2FC, -log10(p_val_adj))) + geom_point(aes(col=Sig)) + scale_color_manual(values=c( `WT`="#87421f", `n.s.`="grey", `KO`="#cdaa7d"))+ geom_hline(yintercept = -log10(threshold.adjp), linetype='dashed', col = 'grey')+ geom_vline(xintercept = c(-threshold.log2fc, threshold.log2fc),  linetype='dashed', col = 'grey')+ geom_text_repel(data=filter(MG_WTvsKO.volcano, Gene %in% Gene.to.show.ValcanoPlot), size = 2, aes(label=Gene, fontface = "italic"), box.padding = 1) + theme_classic() + theme(legend.position="none")+ theme(panel.border = element_rect(colour = "black", fill = NA, size = 1))
+
+```
+
+```{r fig.height=6, fig.width=4}
+MG <- subset(sc, idents = c("MG WT", "MG KO"))
+all.genes <- rownames(MG)
+MG <- ScaleData(MG, features = all.genes)
+pal_MG <-c("#87421f", "#cdaa7d")
+
+DoHeatmap(MG, features = rev(rownames(MG_WTvsKO.markers)), group.colors = pal_MG, size = 0) + scale_fill_gradientn(colors = c("blue", "white", "red")) +
+   theme(axis.text.y = element_text(size = 4))+ theme(legend.position = 'none')
+
+```
+
+```{r}
+sessionInfo()
+```
+
