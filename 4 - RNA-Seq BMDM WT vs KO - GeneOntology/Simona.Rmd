@@ -1,0 +1,93 @@
+---
+title: "GO Sementic analysis"
+author: "Joan Abinet"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+  header-includes:
+    -|
+    ```{=latex}
+    \usepackage{fvextra}
+    \DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+      breaksymbolleft={}, 
+      showspaces = false,
+      showtabs = false,
+      breaklines,
+      commandchars=\\\{\}
+    }
+    ```
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+# Introduction
+
+Gene ontology (GO) analyses also showed that genes upregulated in control BMDM were significantly enriched for terms related to developmental processes including cell-cell differentiation and cell development, while genes upregulated in Mafb-deficient BMDM were associated with terms related to response to stimuli such as cell communication and cell activation, reminiscent of a monocyte phenotype.
+
+# Load packages
+```{r}
+suppressMessages(library(dplyr))
+suppressMessages(library(Seurat))
+suppressMessages(library(patchwork))
+suppressMessages(library(ggplot2))
+suppressMessages(library(simplifyEnrichment))
+suppressMessages(library(formatR))
+suppressMessages(library(simona))
+suppressMessages(library(org.Mm.eg.db))
+suppressMessages(library(ComplexHeatmap))
+```
+
+
+# Create Directed Acyclic Graph (DAG)
+```{r, eval = FALSE}
+dag <- create_ontology_DAG_from_GO_db(org_db = "org.Mm.eg.db")
+```
+
+# GO for Mafb KO macrophage
+```{r, eval = FALSE}
+# Load genes up in KO BMDM
+DE_results <- read.table("DEG.csv", header = T, sep = ",")
+DE_results <- DE_results[order(DE_results$log2FoldChange.x, decreasing = T),]
+
+# Convert gene symbol to entrez ID
+Gene_entrez <- mapIds(org.Mm.eg.db, keys = DE_results$X[1:438], keytype="SYMBOL", column = "ENTREZID")
+
+# Perform ORA
+Gene_entrez <- Gene_entrez[!is.na(Gene_entrez)]
+
+tb = dag_enrich_on_genes(dag, Gene_entrez)
+tb = tb[order(tb$p_adjust), ]
+top_go_ids = tb$term[1:100]
+
+# Plot the significant GO terms in a DAG
+dag_circular_viz(dag, top_go_ids)
+```
+
+# GO for Mafb WT macrophage
+```{r, eval = FALSE}
+# Load genes up in WT BMDM
+DE_results <- read.table("DEG.csv", header = T, sep = ",")
+DE_results <- DE_results[order(DE_results$log2FoldChange.x, decreasing = T),]
+
+# Convert gene symbol to entrez ID
+Gene_entrez <- mapIds(org.Mm.eg.db, keys = DE_results$X[439:808], keytype="SYMBOL", column = "ENTREZID")
+
+# Perform ORA
+Gene_entrez <- Gene_entrez[!is.na(Gene_entrez)]
+
+tb = dag_enrich_on_genes(dag, Gene_entrez) 
+tb = tb[order(tb$p_adjust), ]
+top_go_ids = tb$term[1:100]
+
+# Plot the significant GO terms in a DAG
+dag_circular_viz(dag, top_go_ids)
+```
+
+```{r}
+sessionInfo()
+```
+
