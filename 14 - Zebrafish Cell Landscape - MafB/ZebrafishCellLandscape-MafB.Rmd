@@ -1,0 +1,205 @@
+---
+title: "Zebrafish Cell Landscape - MafB"
+author: "Domien"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  header-includes: "-| ```{=latex} \\usepackage{fvextra} \\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+    breaksymbolleft={}, showspaces = false, showtabs = false, breaklines, commandchars=\\\\\\{\\}
+    } ```"
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+\newpage
+
+# Introduction
+
+To investigate the conservedness of MafB to imprint Mac identity across species we quantified the correlation between Mafb expression and the expression of macrophage sigature genes and MafB target genes in single cell atlases of mouse (Tabula Muris Senis), human (Tabula Sapiens), lemur (Tabula Microcebus), pig (Pig Cell Atlas), African clawed frog (Xenopus Cell Landscape) and zebrafish (Zebrafish Cell Landscape, ZCL).
+
+# Load packages
+
+```{r}
+suppressMessages({
+library(SeuratObject)
+library(Seurat)
+library(readr)
+library(ggplot2)
+library(ggrastr)
+library(readxl)
+library(readr)
+})
+```
+
+# Download Zebrafish Cell Landscape Seurat object from Figshare server
+```{bash, eval = FALSE}
+rdata: https://figshare.com/s/1ab3c6d7648d12247eb2?file=36402453
+cellInfo: https://figshare.com/s/1ab3c6d7648d12247eb2?file=36400452
+```
+
+# Load Zebrafish Cell Landscape Seurat object
+```{r}
+load("ZCDL.rdata")
+ZCL <- pbmc
+rm(pbmc)
+```
+
+# Reconstruct Zebrafish Cell Landscape Seurat object
+```{r}
+ZCDL_cellinfo <- read_csv("ZCDL_cellinfo.csv")
+
+ZCDL_cellinfo$...1 <- NULL
+
+rownames(ZCDL_cellinfo) <- ZCDL_cellinfo$barcodes
+
+ZCL[["CellName"]] <- colnames(ZCL)
+
+ZCL <- subset(ZCL, subset = CellName %in% rownames(ZCDL_cellinfo))
+
+ZCL <- AddMetaData(ZCL, ZCDL_cellinfo)
+
+mat <- ZCDL_cellinfo[,c(6,7)]
+rownames(mat) <- rownames(ZCDL_cellinfo)
+
+colnames(mat) <- c("tsne_1", "tsne_2")
+
+mat <- as.matrix(mat)
+
+ZCL[['tsne']] <- CreateDimReducObject(embeddings = mat, key = 'tsne_', assay = "RNA")
+
+ZCL <- NormalizeData(ZCL)
+```
+
+# Visualize clusters
+```{r fig.height=4, fig.width=4}
+p1 <- DimPlot(ZCL, group.by = "cluster", raster = F)+theme(legend.position='none')+ggtitle("Zebrafish Cell Landscape")
+
+rasterize(p1, layers='Point', dpi=1200)
+```
+
+# Calculate correlation between mafb expression and Mac signature score
+Note: zebrafish have two MafB paralogs: mafba and mafbb
+```{r fig.height=4, fig.width=4.5}
+FeaturePlot(ZCL, features = "mafba", raster = T)
+```
+
+```{r fig.height=4, fig.width=4.5}
+FeaturePlot(ZCL, features = "mafbb", raster = T)
+```
+
+```{r}
+Mac_sign_danio <- read_excel("Mac_sign_danio.xlsx")
+
+Mac_sign_danio <- Mac_sign_danio$ortholog_name
+
+Mac_sign_danio <- intersect(Mac_sign_danio, rownames(ZCL))
+
+
+ZCL <- AddModuleScore(ZCL, features = list(c(Mac_sign_danio)), name = "Mac_sign")
+```
+
+```{r fig.height=4, fig.width=4}
+FeatureScatter(ZCL, feature1 = "mafba", feature2 = "Mac_sign1", raster = T)+
+  geom_smooth(method='lm', colour = "black")+
+  theme(legend.position='none')
+FeatureScatter(ZCL, feature1 = "mafbb", feature2 = "Mac_sign1", raster = T)+
+  geom_smooth(method='lm', colour = "black")+
+  theme(legend.position='none')
+```
+
+```{r}
+corr <- FetchData(ZCL, vars = "mafba")
+corr <- cbind(corr, FetchData(ZCL, vars = "mafbb"))
+corr <- cbind(corr, FetchData(ZCL, vars = "Mac_sign1"))
+
+cor.test(corr$mafba, corr$Mac_sign1, method = "pearson")
+cor.test(corr$mafbb, corr$Mac_sign1, method = "pearson")
+```
+
+```{r fig.height=4, fig.width=4}
+p2 <- ggplot(corr, aes(x = mafba, y = Mac_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("mafba expression")+
+  ylab("Macrophage signature score")+
+  theme_classic()
+
+rasterize(p2, layers='Point', dpi=600)
+```
+
+```{r fig.height=4, fig.width=4}
+p3 <- ggplot(corr, aes(x = mafbb, y = Mac_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("mafba expression")+
+  ylab("Macrophage signature score")+
+  theme_classic()
+
+rasterize(p3, layers='Point', dpi=600)
+```
+
+# Calculate correlation between mafb expression and MafB target gene signature score
+```{r}
+MafB_target_danio <- read_excel("MafB_target_danio.xlsx")
+
+MafB_target_danio <- MafB_target_danio$ortholog_name
+
+MafB_target_danio <- intersect(MafB_target_danio, rownames(ZCL))
+
+
+ZCL <- AddModuleScore(ZCL, features = list(c(MafB_target_danio)), name = "MafB_target_sign")
+```
+
+```{r fig.height=4, fig.width=4}
+FeatureScatter(ZCL, feature1 = "mafba", feature2 = "MafB_target_sign1", raster = T)+
+  geom_smooth(method='lm', colour = "black")+
+  theme(legend.position='none')
+FeatureScatter(ZCL, feature1 = "mafbb", feature2 = "MafB_target_sign1", raster = T)+
+  geom_smooth(method='lm', colour = "black")+
+  theme(legend.position='none')
+```
+
+```{r}
+corr <- cbind(corr, FetchData(ZCL, vars = "MafB_target_sign1"))
+
+cor.test(corr$mafba, corr$MafB_target_sign1, method = "pearson")
+cor.test(corr$mafbb, corr$MafB_target_sign1, method = "pearson")
+```
+
+```{r fig.height=4, fig.width=4}
+p4 <- ggplot(corr, aes(x = mafba, y = MafB_target_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("mafba expression")+
+  ylab("MafB target gene signature score")+
+  theme_classic()
+
+rasterize(p4, layers='Point', dpi=600)
+```
+
+
+```{r fig.height=4, fig.width=4}
+p5 <- ggplot(corr, aes(x = mafbb, y = MafB_target_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("mafba expression")+
+  ylab("MafB target gene signature score")+
+  theme_classic()
+
+rasterize(p5, layers='Point', dpi=600)
+```
+
+```{r}
+sessionInfo()
+```
+
+
+
