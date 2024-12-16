@@ -19,9 +19,13 @@ output:
 knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
 ```
 
+\newpage
+
 # Introduction
 
 To objectively examine the effects of MafB deficiency on global and subset-specific mac identity, we used the global mac signature score generated above and created RTM subset-specific scores based on the DEGs of each RTM subset compared to other RTM in our scRNA-seq data. Interestingly, global mac signature scores were all significantly lower in Mafb-deficient RTMs as compared to their wild-type counterparts, except for MHC-II+ CM. Moreover, we found that each RTM subsets from Lyz2CreMafbfl/fl mice, except for SPM and IM, exhibited a significantly lower score for RTM-subset specific signatures as compared to their wild-type controls. Fourth, we mapped the monocyte signature and found that all Mafb-deficient RTM, except Ly6C+ CM, exhibited a significantly higher monocyte score as compared to wild-type RTM. These findings collectively support a profound disruption in global mac and RTM subset-specific identities in the absence of MafB in vivo, as well as a monocyte signature suggestive of immaturity and incomplete differentiation.
+
+We identified MafB target genes by CUT&RUN on BMDM and found that the expression of MafB target genes was reduced in all RTM subsets from Lyz2CreMafbfl/fl mice. One binding site of MafB was situated in the Csf1r FIRE enhancer. Csf1r expression was reduced in SPM, KC and IM from Lyz2CreMafbfl/fl mice.
 
 # Load packages
 
@@ -676,6 +680,179 @@ mean(MG_KO$Mo_MG_sign1)
 wilcox.test(MG_WT$Mo_MG_sign1, MG_KO$Mo_MG_sign1) #p-value = 0.02041
 ```
 
+## MafB target gene signature score
+
+MafB peaks were identified by CUT&RUN on BMDM
+```{r}
+MafB_Peaks <- read_excel("MafB_Peaks.xlsx")
+
+MafB_target_genes <- MafB_Peaks$`Gene Name`
+
+MafB_target_genes <- unique(MafB_target_genes)
+
+MafB_target_genes <- intersect(MafB_target_genes, rownames(sc))
+
+MafB_target_genes_top500 <- head(MafB_target_genes, n = 500)
+write.table(append(MafB_target_genes_top500, "#MafB_target_genes_top500", 0), file = "MafB_target_genes_top500.grp", row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+sc <- AddModuleScore(sc, features = list(MafB_target_genes_top500), name = 'Mafb_sign')
+
+VlnPlot(sc, features = "Mafb_sign1", cols = pal, pt.size = 0) + theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("")
+```
+
+### SPM
+```{r fig.height=4, fig.width=2.5}
+pal_SPM <- c("#6A3D9A", "#CAB2D6")
+
+VlnPlot(sc, features = "Mafb_sign1", cols = pal_SPM, pt.size = 0, idents = c("SPM WT", "SPM KO"))+ggtitle("SPM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+metadata <- sc@meta.data
+SPM_WT <- metadata[metadata$Condition == "SPM WT",]
+SPM_KO <- metadata[metadata$Condition == "SPM KO",]
+
+wilcox.test(SPM_WT$Mafb_sign1, SPM_KO$Mafb_sign1) #3.08e-11
+```
+
+### LPM
+```{r fig.height=4, fig.width=2.5}
+pal_LPM <-c("#e31a1c", "#fb9a99")
+
+VlnPlot(sc, features = "Mafb_sign1", cols = pal_LPM, pt.size = 0, idents = c("LPM WT", "LPM KO"))+ggtitle("LPM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+LPM_WT <- metadata[metadata$Condition == "LPM WT",]
+LPM_KO <- metadata[metadata$Condition == "LPM KO",]
+
+wilcox.test(LPM_WT$Mafb_sign1, LPM_KO$Mafb_sign1) #< 2.2e-16
+```
+
+### KC
+```{r fig.height=4, fig.width=2.5}
+pal_KC <- c("#33a02c", "#b2df8a")
+
+VlnPlot(sc, features = "Mafb_sign1", cols = pal_KC, pt.size = 0, idents = c("KC WT", "KC KO"))+ggtitle("KC")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+KC_WT <- metadata[metadata$Condition == "KC WT",]
+KC_KO <- metadata[metadata$Condition == "KC KO",]
+
+wilcox.test(KC_WT$Mafb_sign1, KC_KO$Mafb_sign1) #3.096e-09
+```
+
+### IM
+```{r fig.height=4, fig.width=2.5}
+pal_IM <- c("#1f78b4", "#a6cee3")
+
+VlnPlot(sc, features = "Mafb_sign1", cols = pal_IM, pt.size = 0, idents = c("IM WT", "IM KO"))+ggtitle("IM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+IM_WT <- metadata[metadata$Condition == "IM WT",]
+IM_KO <- metadata[metadata$Condition == "IM KO",]
+
+wilcox.test(IM_WT$Mafb_sign1, IM_KO$Mafb_sign1) #< 2.2e-16
+```
+
+### Ly6C+ CM
+```{r fig.height=4, fig.width=2.5}
+pal_Ly6C <- c("#FF7F00", "#FDBF6F")
+
+VlnPlot(sc, features = "Mafb_sign1", cols = pal_Ly6C, pt.size = 0, idents = c("Ly6C+ CM WT", "Ly6C+ CM KO"))+ggtitle("Ly6C+ CM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+Ly6C_WT <- metadata[metadata$Condition == "Ly6C+ CM WT",]
+Ly6C_KO <- metadata[metadata$Condition == "Ly6C+ CM KO",]
+
+wilcox.test(Ly6C_WT$Mafb_sign1, Ly6C_KO$Mafb_sign1) #2.816e-06
+```
+
+### MHC-II+ CM
+```{r fig.height=4, fig.width=2.5}
+pal_MHC2 <- c("#FF00FA", "#FFA1FD")
+
+VlnPlot(sc, features = "Mafb_sign1", cols = pal_MHC2, pt.size = 0, idents = c("MHC2+ CM WT", "MHC2+ CM KO"))+ggtitle("MHC-II+ CM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+MHC2_WT <- metadata[metadata$Condition == "MHC2+ CM WT",]
+MHC2_KO <- metadata[metadata$Condition == "MHC2+ CM KO",]
+
+wilcox.test(MHC2_WT$Mafb_sign1, MHC2_KO$Mafb_sign1) #0.006117
+```
+
+### MG
+```{r fig.height=4, fig.width=2.5}
+pal_MG <- c("#87421F", "#CDAA7D")
+
+VlnPlot(sc, features = "Mafb_sign1", cols = pal_MG, pt.size = 0, idents = c("MG WT", "MG KO"))+ggtitle("MG")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+```{r}
+MG_WT <- metadata[metadata$Condition == "MG WT",]
+MG_KO <- metadata[metadata$Condition == "MG KO",]
+
+wilcox.test(MG_WT$Mafb_sign1, MG_KO$Mafb_sign1) #0.0001445
+```
+
+## Csf1r expression
+
+```{r}
+VlnPlot(sc, features = "Csf1r", cols = pal, pt.size = 0) + theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("")
+```
+
+### SPM
+```{r fig.height=4, fig.width=2.5}
+pal_SPM <- c("#6A3D9A", "#CAB2D6")
+
+VlnPlot(sc, features = "Csf1r", cols = pal_SPM, pt.size = 0, idents = c("SPM WT", "SPM KO"))+ggtitle("SPM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+### LPM
+```{r fig.height=4, fig.width=2.5}
+pal_LPM <-c("#e31a1c", "#fb9a99")
+
+VlnPlot(sc, features = "Csf1r", cols = pal_LPM, pt.size = 0, idents = c("LPM WT", "LPM KO"))+ggtitle("LPM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+### KC
+```{r fig.height=4, fig.width=2.5}
+pal_KC <- c("#33a02c", "#b2df8a")
+
+VlnPlot(sc, features = "Csf1r", cols = pal_KC, pt.size = 0, idents = c("KC WT", "KC KO"))+ggtitle("KC")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+### IM
+```{r fig.height=4, fig.width=2.5}
+pal_IM <- c("#1f78b4", "#a6cee3")
+
+VlnPlot(sc, features = "Csf1r", cols = pal_IM, pt.size = 0, idents = c("IM WT", "IM KO"))+ggtitle("IM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+### Ly6C+ CM
+```{r fig.height=4, fig.width=2.5}
+pal_Ly6C <- c("#FF7F00", "#FDBF6F")
+
+VlnPlot(sc, features = "Csf1r", cols = pal_Ly6C, pt.size = 0, idents = c("Ly6C+ CM WT", "Ly6C+ CM KO"))+ggtitle("Ly6C+ CM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+### MHC-II+ CM
+```{r fig.height=4, fig.width=2.5}
+pal_MHC2 <- c("#FF00FA", "#FFA1FD")
+
+VlnPlot(sc, features = "Csf1r", cols = pal_MHC2, pt.size = 0, idents = c("MHC2+ CM WT", "MHC2+ CM KO"))+ggtitle("MHC-II+ CM")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
+
+### MG
+```{r fig.height=4, fig.width=2.5}
+pal_MG <- c("#87421F", "#CDAA7D")
+
+VlnPlot(sc, features = "Csf1r", cols = pal_MG, pt.size = 0, idents = c("MG WT", "MG KO"))+ggtitle("MG")+ theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())
+```
 
 
 ```{r}
