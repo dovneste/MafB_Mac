@@ -1,0 +1,131 @@
+---
+title: "Tabula Muris Senis - MafB"
+author: "Domien"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  header-includes: "-| ```{=latex} \\usepackage{fvextra} \\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+    breaksymbolleft={}, showspaces = false, showtabs = false, breaklines, commandchars=\\\\\\{\\}
+    } ```"
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+\newpage
+
+# Introduction
+
+To investigate the conservedness of MafB to imprint Mac identity across species we quantified the correlation between Mafb expression and the expression of macrophage sigature genes and MafB target genes in single cell atlases of mouse (Tabula Muris Senis), human (Tabula Sapiens), lemur (Tabula Microcebus), pig (Pig Cell Atlas), African clawed frog (Xenopus Cell Landscape) and zebrafish (Zebrafish Cell Landscape, ZCL).
+
+# Load packages
+
+```{r}
+suppressMessages({
+library(SeuratObject)
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(ggrastr)
+})
+```
+
+# Load Tabula Muris Senis Seurat object
+
+```{r}
+tbms <- readRDS("tbms.rds")
+```
+
+# Visualize clusters
+
+```{r fig.height=4, fig.width=4}
+p1 <- DimPlot(tbms, raster = F, group.by = "leiden")+
+  theme(legend.position='none')+ggtitle("Tabula Muris Senis")
+
+rasterize(p1, layers='Point', dpi=1200)
+```
+
+# Calculate correlation between Mafb expression and Mac signature score
+
+```{r fig.height=4, fig.width=4.3}
+FeaturePlot(tbms, features = "Mafb", raster = T)
+```
+
+```{r}
+Mac_sign <- read_excel("Mac_sign.xlsx")
+Mac_sign <- Mac_sign$Gene_Symbol
+Mac_sign <- intersect(Mac_sign, rownames(tbms))
+tbms <- AddModuleScore(tbms, features = list(c(Mac_sign)), name = "Mac_sign")
+```
+
+```{r}
+FeaturePlot(tbms, features = "Mac_sign1", raster = T)
+VlnPlot(tbms, features = "Mac_sign1", group.by = "louvain", pt.size = 0)
+FeatureScatter(tbms, feature1 = "Mafb", feature2 = "Mac_sign1")+
+  geom_smooth(method='lm', colour = "black")+
+  theme(legend.position='none')
+```
+
+```{r}
+corr <- FetchData(tbms, vars = "Mafb") 
+corr <- cbind(corr, FetchData(tbms, vars = "Mac_sign1"))
+
+cor.test(corr$Mafb, corr$Mac_sign1, method = "pearson")
+```
+
+```{r fig.height=4, fig.width=4}
+p2 <- ggplot(corr, aes(x = Mafb, y = Mac_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("Mafb Expression")+
+  ylab("Macrophage signature score")+
+  theme_classic()
+
+rasterize(p2, layers='Point', dpi=600)
+```
+
+# Calculate correlation between Mafb expression and MafB target gene signature score
+
+```{r}
+MafB_Peaks <- read_excel("MafB_Peaks.xlsx")
+MafB_target_sign <- MafB_Peaks$`Gene Name`
+MafB_target_sign <- intersect(MafB_target_sign, rownames(tbms))
+tbms <- AddModuleScore(tbms, features = list(c(MafB_target_sign)), name = "MafB_target_sign")
+```
+
+```{r}
+FeaturePlot(tbms, features = "MafB_target_sign1", raster = T)
+VlnPlot(tbms, features = "MafB_target_sign1", group.by = "louvain", pt.size = 0)
+FeatureScatter(tbms, feature1 = "Mafb", feature2 = "MafB_target_sign1")+
+  geom_smooth(method='lm', colour = "black")+
+  theme(legend.position='none')
+```
+
+```{r}
+corr <- cbind(corr, FetchData(tbms, vars = "MafB_target_sign1"))
+
+cor.test(corr$Mafb, corr$MafB_target_sign1, method = "pearson")
+```
+
+```{r fig.height=4, fig.width=4}
+p3 <- ggplot(corr, aes(x = Mafb, y = MafB_target_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("Mafb Expression")+
+  ylab("MafB target gene signature score")+
+  theme_classic()
+rasterize(p3, layers='Point', dpi=600)
+```
+
+```{r}
+sessionInfo()
+```
+
