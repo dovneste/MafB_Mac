@@ -1,0 +1,151 @@
+---
+title: "Tabula Sapiens - MafB"
+author: "Domien"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  header-includes: "-| ```{=latex} \\usepackage{fvextra} \\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+    breaksymbolleft={}, showspaces = false, showtabs = false, breaklines, commandchars=\\\\\\{\\}
+    } ```"
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+\newpage
+
+# Introduction
+
+To investigate the conservedness of MafB to imprint Mac identity across species we quantified the correlation between Mafb expression and the expression of macrophage sigature genes and MafB target genes in single cell atlases of mouse (Tabula Muris Senis), human (Tabula Sapiens), lemur (Tabula Microcebus), pig (Pig Cell Atlas), African clawed frog (Xenopus Cell Landscape) and zebrafish (Zebrafish Cell Landscape, ZCL).
+
+# Load packages
+
+```{r}
+suppressMessages({
+library(SeuratObject)
+library(Seurat)
+library(reticulate)
+library(sceasy)
+library(ggplot2)
+library(ggrastr)
+library(readxl)
+})
+```
+
+# Download Tabula Sapiens scanpy object from Figshare server
+```{bash, eval = FALSE}
+https://figshare.com/articles/dataset/Tabula_Sapiens_release_1_0/14267219?file=40067134
+```
+
+# Convert Scanpy object to Seurat object
+```{r, eval = FALSE}
+sceasy::convertFormat("TabulaSapiens.h5ad", from="anndata", to="seurat",
+                       outFile='TBS.rds')
+```
+
+# Load Tabula Sapiens Seurat object
+
+```{r}
+TBS <- readRDS("TBS.rds")
+```
+
+# Visualize clusters
+
+```{r fig.height=4, fig.width=4}
+p1 <- DimPlot(TBS, raster = F, group.by = "cell_ontology_class", reduction = "umap")+
+  theme(legend.position='none')+ggtitle("Tabula Sapiens")
+
+rasterize(p1, layers='Point', dpi=1200)
+```
+
+# Calculate correlation between MAFB expression and Mac signature score
+
+Gene: MAFB ENSG00000204103
+```{r fig.height=4, fig.width=4}
+FeaturePlot(TBS, features = "ENSG00000204103", raster = T)
+```
+
+```{r}
+Mac_sign <- read_excel("Mac_sign_human.xlsx")
+
+Mac_sign <- Mac_sign$ortholog_ensg
+
+Mac_sign <- intersect(Mac_sign, rownames(TBS))
+
+TBS <- AddModuleScore(TBS, features = list(c(Mac_sign)), name = "Mac_sign")
+```
+
+```{r fig.height=4, fig.width=4}
+FeaturePlot(TBS, features = "Mac_sign1", raster = T)
+
+FeatureScatter(TBS, feature1 = "ENSG00000204103", feature2 = "Mac_sign1")+
+  geom_smooth(method='lm', colour = "black")+
+  theme(legend.position='none')
+```
+
+```{r}
+corr <- FetchData(TBS, vars = "ENSG00000204103") 
+corr <- cbind(corr, FetchData(TBS, vars = "Mac_sign1"))
+
+cor.test(corr$ENSG00000204103, corr$Mac_sign1, method = "pearson")
+```
+
+```{r fig.height=4, fig.width=4}
+p2 <- ggplot(corr, aes(x = ENSG00000204103, y = Mac_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("MAFB Expression")+
+  ylab("Macrophage signature score")+
+  theme_classic()
+
+rasterize(p2, layers='Point', dpi=600)
+```
+
+# Calculate correlation between MAFB expression and MafB target gene signature score
+
+```{r}
+MafB_target_sign <- read_excel("MafB_target_human.xlsx")
+
+MafB_target_sign <- MafB_target_sign$ortholog_ensg
+
+MafB_target_sign <- intersect(MafB_target_sign, rownames(TBS))
+
+TBS <- AddModuleScore(TBS, features = list(c(MafB_target_sign)), name = "MafB_target_sign")
+```
+
+```{r fig.height=4, fig.width=4}
+FeaturePlot(TBS, features = "MafB_target_sign1", raster = T)
+
+FeatureScatter(TBS, feature1 = "ENSG00000204103", feature2 = "MafB_target_sign1")+
+  geom_smooth(method='lm', colour = "black")+
+  theme(legend.position='none')
+```
+
+```{r}
+corr <- cbind(corr, FetchData(TBS, vars = "MafB_target_sign1"))
+
+cor.test(corr$ENSG00000204103, corr$MafB_target_sign1, method = "pearson")
+```
+
+```{r fig.height=4, fig.width=4}
+p3 <- ggplot(corr, aes(x = ENSG00000204103, y = MafB_target_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("MAFB Expression")+
+  ylab("MafB target gene signature score")+
+  theme_classic()
+rasterize(p3, layers='Point', dpi=600)
+```
+
+```{r}
+sessionInfo()
+```
+
+
