@@ -6,15 +6,15 @@ This GitHub repository is the deposit of source codes for the bioinformatic anal
 Domien Vanneste<sup>1,2</sup>, Wen Peng<sup>1,2</sup>, Joan Abinet<sup>1,2</sup>, Alexis Balthazar<sup>2,3</sup>, Alexandre Hego<sup>4</sup>, Fabrice Bureau<sup>2,5</sup>, Philippe Compère<sup>6,7</sup>, Coraline Radermecker<sup>1,2</sup>, Bénédicte Machiels2<sup>2,3</sup> & Thomas Marichal<sup>1,2,8,9,*</sup>
 
 ## Affiliations
-1Laboratory of Immunophysiology, GIGA Institute, University of Liège, Liège, Belgium
-2Faculty of Veterinary Medicine, University of Liège, Liège, Belgium
-3Laboratory of Immunology-Vaccinology, FARAH Institute, University of Liège, Liège, Belgium
-4In Vitro Imaging Platform, GIGA Institute, University of Liège, Liège, Belgium
-5Laboratory of Cellular and Molecular Immunology, GIGA Institute, University of Liège, Liège, Belgium
-6Laboratory of Functional and Evolutionary Morphology, FOCUS Research Unit, Department of Biology, Ecology and Evolution, University of Liège, Liège, Belgium
-7Center for Applied Research and Education in Microscopy (CAREM) and Biomaterials Interfaculty Center (CEIB), University of Liège, Liège, Belgium
-8Walloon Excellence in Life Sciences and Biotechnology (WELBIO) Department, WEL Research Institute, Wavre, Belgium.
-9Lead contact
+<sup>1</sup>Laboratory of Immunophysiology, GIGA Institute, University of Liège, Liège, Belgium
+<sup>2</sup>Faculty of Veterinary Medicine, University of Liège, Liège, Belgium
+<sup>3</sup>Laboratory of Immunology-Vaccinology, FARAH Institute, University of Liège, Liège, Belgium
+<sup>4</sup>In Vitro Imaging Platform, GIGA Institute, University of Liège, Liège, Belgium
+<sup>5</sup>Laboratory of Cellular and Molecular Immunology, GIGA Institute, University of Liège, Liège, Belgium
+<sup>6</sup>Laboratory of Functional and Evolutionary Morphology, FOCUS Research Unit, Department of Biology, Ecology and Evolution, University of Liège, Liège, Belgium
+<sup>7</sup>Center for Applied Research and Education in Microscopy (CAREM) and Biomaterials Interfaculty Center (CEIB), University of Liège, Liège, Belgium
+<sup>8</sup>Walloon Excellence in Life Sciences and Biotechnology (WELBIO) Department, WEL Research Institute, Wavre, Belgium.
+<sup>9</sup>Lead contact
 *Correspondence: t.marichal@uliege.be (T.M.)
 
 ## Summary
