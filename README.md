@@ -1,5 +1,5 @@
 Dear reviewer,
-This GitHub repository is the deposit of source codes for the bioinformatic analyses in the manuscript:
+this GitHub repository is the deposit of source codes for the bioinformatic analyses in the manuscript:
 
 # MafB is a conserved transcriptional regulator of macrophage development and identity across tissues and species
 
