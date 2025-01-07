@@ -690,12 +690,12 @@ MafB_target_genes <- MafB_Peaks$`Gene Name`
 
 MafB_target_genes <- unique(MafB_target_genes)
 
+
+write.table(append(MafB_target_genes, "#MafB_target_genes", 0), file = "MafB_target_genes.grp", row.names = FALSE, col.names = FALSE, quote = FALSE)
+
 MafB_target_genes <- intersect(MafB_target_genes, rownames(sc))
 
-MafB_target_genes_top500 <- head(MafB_target_genes, n = 500)
-write.table(append(MafB_target_genes_top500, "#MafB_target_genes_top500", 0), file = "MafB_target_genes_top500.grp", row.names = FALSE, col.names = FALSE, quote = FALSE)
-
-sc <- AddModuleScore(sc, features = list(MafB_target_genes_top500), name = 'Mafb_sign')
+sc <- AddModuleScore(sc, features = list(MafB_target_genes), name = 'Mafb_sign')
 
 VlnPlot(sc, features = "Mafb_sign1", cols = pal, pt.size = 0) + theme(legend.position = 'none', axis.title.x = element_blank(), axis.text.x=element_blank())+ggtitle("")
 ```
@@ -712,7 +712,7 @@ metadata <- sc@meta.data
 SPM_WT <- metadata[metadata$Condition == "SPM WT",]
 SPM_KO <- metadata[metadata$Condition == "SPM KO",]
 
-wilcox.test(SPM_WT$Mafb_sign1, SPM_KO$Mafb_sign1) #3.08e-11
+wilcox.test(SPM_WT$Mafb_sign1, SPM_KO$Mafb_sign1)
 ```
 
 ### LPM
@@ -726,7 +726,7 @@ VlnPlot(sc, features = "Mafb_sign1", cols = pal_LPM, pt.size = 0, idents = c("LP
 LPM_WT <- metadata[metadata$Condition == "LPM WT",]
 LPM_KO <- metadata[metadata$Condition == "LPM KO",]
 
-wilcox.test(LPM_WT$Mafb_sign1, LPM_KO$Mafb_sign1) #< 2.2e-16
+wilcox.test(LPM_WT$Mafb_sign1, LPM_KO$Mafb_sign1)
 ```
 
 ### KC
@@ -740,7 +740,7 @@ VlnPlot(sc, features = "Mafb_sign1", cols = pal_KC, pt.size = 0, idents = c("KC 
 KC_WT <- metadata[metadata$Condition == "KC WT",]
 KC_KO <- metadata[metadata$Condition == "KC KO",]
 
-wilcox.test(KC_WT$Mafb_sign1, KC_KO$Mafb_sign1) #3.096e-09
+wilcox.test(KC_WT$Mafb_sign1, KC_KO$Mafb_sign1)
 ```
 
 ### IM
@@ -754,7 +754,7 @@ VlnPlot(sc, features = "Mafb_sign1", cols = pal_IM, pt.size = 0, idents = c("IM 
 IM_WT <- metadata[metadata$Condition == "IM WT",]
 IM_KO <- metadata[metadata$Condition == "IM KO",]
 
-wilcox.test(IM_WT$Mafb_sign1, IM_KO$Mafb_sign1) #< 2.2e-16
+wilcox.test(IM_WT$Mafb_sign1, IM_KO$Mafb_sign1)
 ```
 
 ### Ly6C+ CM
@@ -768,7 +768,7 @@ VlnPlot(sc, features = "Mafb_sign1", cols = pal_Ly6C, pt.size = 0, idents = c("L
 Ly6C_WT <- metadata[metadata$Condition == "Ly6C+ CM WT",]
 Ly6C_KO <- metadata[metadata$Condition == "Ly6C+ CM KO",]
 
-wilcox.test(Ly6C_WT$Mafb_sign1, Ly6C_KO$Mafb_sign1) #2.816e-06
+wilcox.test(Ly6C_WT$Mafb_sign1, Ly6C_KO$Mafb_sign1)
 ```
 
 ### MHC-II+ CM
@@ -782,7 +782,7 @@ VlnPlot(sc, features = "Mafb_sign1", cols = pal_MHC2, pt.size = 0, idents = c("M
 MHC2_WT <- metadata[metadata$Condition == "MHC2+ CM WT",]
 MHC2_KO <- metadata[metadata$Condition == "MHC2+ CM KO",]
 
-wilcox.test(MHC2_WT$Mafb_sign1, MHC2_KO$Mafb_sign1) #0.006117
+wilcox.test(MHC2_WT$Mafb_sign1, MHC2_KO$Mafb_sign1)
 ```
 
 ### MG
@@ -796,7 +796,7 @@ VlnPlot(sc, features = "Mafb_sign1", cols = pal_MG, pt.size = 0, idents = c("MG 
 MG_WT <- metadata[metadata$Condition == "MG WT",]
 MG_KO <- metadata[metadata$Condition == "MG KO",]
 
-wilcox.test(MG_WT$Mafb_sign1, MG_KO$Mafb_sign1) #0.0001445
+wilcox.test(MG_WT$Mafb_sign1, MG_KO$Mafb_sign1)
 ```
 
 ## Csf1r expression
