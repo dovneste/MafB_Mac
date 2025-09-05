@@ -1,0 +1,701 @@
+---
+title: "CUT&RUN BMDM WT vs KO - Figures"
+author: "Domien Vanneste"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  header-includes: "-| ```{=latex} \\usepackage{fvextra} \\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+    breaksymbolleft={}, showspaces = false, showtabs = false, breaklines, commandchars=\\\\\\{\\}
+    } ```"
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+\newpage
+
+# Introduction
+Despite substantial evidence pointing to MafB as an essential regulator of core mac identity, the genes it directly controls and the mechanisms underlying this regulation remain poorly understood. To address this question, we performed  cleavage under targets and release using nuclease (CUT&RUN) for MafB on BMDMs from Mafbfl/fl and Lyz2CreMafbfl/fl mice. MafB and H3K27ac CUT&RUN was performed with a CUTANA ChIC/CUT&RUN Kit (EpiCypher, 141048) according to manufacturer’s instructions, with modifications. BMDMs from Mafbfl/fl or Lyz2CreMafbfl/fl mice were washed with ice-cold PBS and fixed with 0.1 % formaldehyde in PBS for 2 min at room temperature. Fixation was quenched by adding glycine (Merck, 104691000) to 0.125 M.  For each CUT&RUN sample, 1 x 10^6 fixed cells and 0.5 µg antibodies were added:
+
+IgG (EpiCypher, 13-0042)
+
+MafB2 (Cell Signaling Technology, 41019)
+
+H3K27ac (Thermo Fisher Scientific, MA5-23516).
+
+CUT&RUN libraries were prepared with a CUTANA™ CUT&RUN Library Prep Kit (EpiCypher, 141001) according to manufacturer’s instructions. These libraries were sequenced on an NovaSeq 6000 (Illumina) sequencer on an S4 flow cell at 10 million reads per sample.
+\newpage
+
+# Load Packages
+
+```{r}
+suppressMessages({
+library(ggplot2)
+library(colorRamp2)
+library(ComplexHeatmap)
+library(readxl)
+library(futile.logger)
+library(grid)
+library(rtracklayer)
+library(dplyr)
+library(VennDiagram)
+library(Rtoolbox)
+library(SeuratObject)
+library(Seurat)
+library(introdataviz)
+})
+```
+
+
+# Figure S6A
+
+```{r}
+MafB2_peaks_rep1 <- read.table("MafB2_WT_R1.seacr.peaks.stringent.bed", header = FALSE, sep = "\t")
+
+MafB2_peaks_rep2 <- read.table("MafB2_WT_R2.seacr.peaks.stringent.bed", header = FALSE, sep = "\t")
+
+MafB2_peaks_consensus <- read.table("MafB2_WT.seacr.consensus.peak_counts.bed", header = FALSE, sep = "\t")
+```
+
+```{r}
+#peaks rep1
+nrow(MafB2_peaks_rep1)
+
+#peaks rep2
+nrow(MafB2_peaks_rep2)
+
+#consensus peaks
+nrow(MafB2_peaks_consensus)
+
+#shared peaks
+length(which(MafB2_peaks_consensus[,10] == 2))
+```
+
+## Rep. 1
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_WT_R1.seacr.peaks.stringent.bed mm10 -size 4000 -hist 10 -d MafB2_WT_R1/ > MafB2_WT_R1_hist.txt
+```
+
+```{r}
+MafB2_WT_R1_hist <- read.table("MafB2_WT_R1_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_WT_R1_hist)[colnames(MafB2_WT_R1_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB2_WT_R1.seacr.peaks.stringent.bed.mm10..size.4000..hist.10..d.MafB2_WT_R1.."] <- "Distance.from.Center"
+```
+
+n peaks : 10549
+FDR =  0.00343158820941492
+
+```{r fig.height=3, fig.width=3}
+ggplot(data = MafB2_WT_R1_hist, aes(x = Distance.from.Center, y = MafB2_WT_R1..Coverage))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  ggtitle("Rep. 1: 10549 peaks \nFDR = 0.003431588")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r}
+ggsave("Figure_S6A_Rep1.pdf", width = 3, height = 3)
+```
+
+
+## Rep. 2
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_WT_R2.seacr.peaks.stringent.bed mm10 -size 4000 -hist 10 -d MafB2_WT_R2/ > MafB2_WT_R2_hist.txt
+```
+
+```{r}
+MafB2_WT_R2_hist <- read.table("MafB2_WT_R2_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_WT_R2_hist)[colnames(MafB2_WT_R2_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB2_WT_R2.seacr.peaks.stringent.bed.mm10..size.4000..hist.10..d.MafB2_WT_R2.."] <- "Distance.from.Center"
+```
+
+n peaks : 11478
+FDR =  0.00315917375455654
+
+```{r fig.height=3, fig.width=3}
+ggplot(data = MafB2_WT_R2_hist, aes(x = Distance.from.Center, y = MafB2_WT_R2..Coverage))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  ggtitle("Rep. 2: 11478 peaks \nFDR = 0.003159174")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r}
+ggsave("Figure_S6A_Rep2.pdf.pdf", width = 3, height = 3)
+```
+
+# Figure S6B
+
+```{bash eval = FALSE}
+samtools view -c -F 4 MafB2_WT_R1.target.markdup.sorted.bam
+bedtools intersect -a MafB2_WT_R1.target.markdup.sorted.bam -b MafB2_WT_R1.seacr.peaks.stringent.bed -bed | wc -l
+
+samtools view -c -F 4 MafB2_WT_R2.target.markdup.sorted.bam
+bedtools intersect -a MafB2_WT_R2.target.markdup.sorted.bam -b MafB2_WT_R2.seacr.peaks.stringent.bed -bed | wc -l
+```
+
+
+# Figure S6C
+
+```{r}
+MafB2_peaks_merged <- MafB2_peaks_consensus[MafB2_peaks_consensus[,10] == 2, ]
+
+split_scores <- strsplit(as.character(MafB2_peaks_merged$V6), ",")
+
+means <- sapply(split_scores, function(x) {
+  if (all(is.na(x))) return(NA_real_)
+  nums <- as.numeric(x)
+  mean(nums, na.rm = TRUE)
+})
+
+MafB2_peaks_merged$V4 <- means
+
+write.table(MafB2_peaks_merged, "MafB2_peaks_merged.bed", sep="\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks_merged.bed mm10 -d MafB2_WT_R1/ MafB2_WT_R2/ MafB2_KO_R1/ MafB2_KO_R2/ > MafB2_counts.txt
+```
+
+```{r}
+MafB2_counts <- read.table("MafB2_counts.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "PeakID..cmd.annotatePeaks.pl.MafB2_peaks_merged.bed.mm10..d.MafB2_WT_R1..MafB2_WT_R2..MafB2_KO_R1..MafB2_KO_R2.."] <- "PeakID"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_WT_R1..Tag.Count.in.given.bp..5577784.0.Total..normalization.factor...1.79..effective.total...10000000."] <- "MafB2_WT_R1"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_WT_R2..Tag.Count.in.given.bp..6205913.0.Total..normalization.factor...1.61..effective.total...10000000."] <- "MafB2_WT_R2"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_KO_R1..Tag.Count.in.given.bp..5444540.0.Total..normalization.factor...1.84..effective.total...10000000."] <- "MafB2_KO_R1"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_KO_R2..Tag.Count.in.given.bp..6810425.0.Total..normalization.factor...1.47..effective.total...10000000."] <- "MafB2_KO_R2"
+```
+
+```{r fig.height=3.225, fig.width=3}
+ggplot(data = MafB2_counts, aes(x =log2(MafB2_WT_R1+1), y =log2(MafB2_WT_R2+1)))+
+  geom_point(show.legend = FALSE, colour = "blue")+
+  geom_abline(slope = 1)+
+  ggtitle("7256 merged peaks")+
+  xlab("Log2(norm tags + 1) \nRep. 1")+
+  ylab("Rep. 2 \nLog2(norm tags + 1)")+
+  xlim(0,10)+
+  ylim(0,10)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r}
+ggsave("Figure_S6C.pdf", width = 3, height = 3.225)
+```
+
+# Figure 6A
+
+## Histogram
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks_merged.bed mm10 -size 4000 -hist 10 -d MafB2_WT_R1/ MafB2_WT_R2/ MafB2_KO_R1/ MafB2_KO_R2/ > MafB2_hist.txt
+```
+
+```{r}
+MafB2_hist <- read.table("MafB2_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_hist)[colnames(MafB2_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB2_peaks_merged.bed.mm10..size.4000..hist.10..d.MafB2_WT_R1..MafB2_WT_R2..MafB2_KO_R1..MafB2_KO_R2.."] <- "Distance.from.Center"
+
+MafB2_hist$MafB2_WT <- rowMeans(MafB2_hist[,c('MafB2_WT_R1..Coverage', 'MafB2_WT_R2..Coverage')])
+
+MafB2_hist$MafB2_KO <- rowMeans(MafB2_hist[,c('MafB2_KO_R1..Coverage', 'MafB2_KO_R2..Coverage')])
+```
+
+```{r fig.height=4, fig.width=3}
+ggplot(data = MafB2_hist, aes(x = Distance.from.Center, y = MafB2_WT))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  geom_line(show.legend = FALSE, colour = "red", aes(x = Distance.from.Center, y = MafB2_KO))+
+  ggtitle("MafB CUT&RUN in BMDM")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r}
+ggsave("Figure_6A_WTvsKO_Hist.pdf", width = 3, height = 4)
+```
+
+## Heatmap
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks_merged.bed mm10 -size 4000 -hist 25 -ghist -d MafB2_WT_R1/ MafB2_WT_R2/ MafB2_KO_R1/ MafB2_KO_R2/ > MafB2_heatmap.txt
+```
+
+```{r}
+MafB2_heatmap <- read.table("MafB2_heatmap.txt", header = TRUE, check.names = FALSE, sep = "\t")
+
+MafB2_WT_R1_heatmap <- MafB2_heatmap[, 2:162]
+MafB2_WT_R2_heatmap <- MafB2_heatmap[, 163:323]
+MafB2_WT_heatmap <- (MafB2_WT_R1_heatmap+MafB2_WT_R2_heatmap)/2
+
+MafB2_KO_R1_heatmap <- MafB2_heatmap[, 324:484]
+MafB2_KO_R2_heatmap <- MafB2_heatmap[, 485:645]
+MafB2_KO_heatmap <- (MafB2_KO_R1_heatmap+MafB2_KO_R2_heatmap)/2
+```
+
+### WT
+
+```{r fig.height=4, fig.width=2}
+col_fun = colorRamp2(c(0, 15), c( "white", "red"))
+
+pdf("Figure_6A_heatmap_WT.pdf", width = 2, height = 4)
+Heatmap(MafB2_WT_heatmap, col_fun, cluster_columns = F, cluster_rows = F, heatmap_legend_param = list(title = "Tags"), use_raster = TRUE, raster_quality = 10, column_title = "Mafbfl/fl")
+dev.off()
+```
+
+### KO
+
+```{r fig.height=4, fig.width=2}
+col_fun = colorRamp2(c(0, 15), c( "white", "red"))
+
+pdf("Figure_6A_heatmap_KO.pdf", width = 2, height = 4)
+Heatmap(MafB2_KO_heatmap, col_fun, cluster_columns = F, cluster_rows = F, heatmap_legend_param = list(title = "Tags"), use_raster = TRUE, raster_quality = 10, , column_title = "Lyz2CreMafbfl/fl")
+dev.off()
+```
+
+# Figure 6B
+
+```{r}
+MafB2_counts$MafB2_WT <- rowMeans(MafB2_counts[,c('MafB2_WT_R1', 'MafB2_WT_R2')])
+MafB2_counts$MafB2_KO <- rowMeans(MafB2_counts[,c('MafB2_KO_R1', 'MafB2_KO_R2')])
+
+MafB2_counts$log2_MafB2_WT <- log2(MafB2_counts$MafB2_WT + 1)
+MafB2_counts$log2_MafB2_KO <- log2(MafB2_counts$MafB2_KO + 1)
+MafB2_counts$below_diag <- MafB2_counts$log2_MafB2_KO < MafB2_counts$log2_MafB2_WT
+```
+
+```{r fig.height=3.225, fig.width=3}
+ggplot(data = MafB2_counts, aes(x = log2_MafB2_WT, y = log2_MafB2_KO)) +
+  geom_point(aes(color = below_diag), show.legend = FALSE) +
+  scale_color_manual(values = c("FALSE" = "red", "TRUE" = "blue")) +
+  geom_abline(slope = 1) +
+  ggtitle("MafB peaks in BMDM") +
+  xlab("Log2(norm tags + 1) \nMafbfl/fl") +
+  ylab("Lyz2CreMafbfl/fl \nLog2(norm tags + 1)") +
+  xlim(0, 10) +
+  ylim(0, 10) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks.length = unit(.15, "cm"),
+    panel.border = element_rect(fill = NA, color = "black", linetype = "solid")
+  )
+```
+
+```{r}
+ggsave("Figure_6B.pdf", width = 3, height = 3.225)
+```
+
+# Figure 6C
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks.bed genome.fa -gtf genes.gtf > MafB2_peaks_annot.txt
+```
+
+```{r}
+MafB2_peaks_annot <- read.table("MafB2_peaks_annot.txt", header = TRUE, sep = "\t")
+```
+
+```{r}
+MafB2_peaks_annot$Annotation.not.detailed <- sub(" .*", "", MafB2_peaks_annot$Annotation)
+
+table(MafB2_peaks_annot$Annotation.not.detailed)
+```
+
+# Figure 6D
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks.bed mm10 -size 4000 -hist 10 -d tag_directory_WT-H3K27Ac_R1/ tag_directory_WT-H3K27Ac_R2/ tag_directory_KO-H3K27Ac_R1/ tag_directory_KO-H3K27Ac_R2/ > MafB2_H3K27Ac_hist.txt
+```
+
+```{r}
+MafB2_H3K27Ac_hist <- read.table("MafB2_H3K27Ac_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_H3K27Ac_hist)[colnames(MafB2_H3K27Ac_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB2_peaks.bed.mm10..size.4000..hist.10..d.tag_directory_WT.H3K27Ac_R1..tag_directory_WT.H3K27Ac_R2..tag_directory_KO.H3K27Ac_R1..tag_directory_KO.H3K27Ac_R2.."] <- "Distance.from.Center"
+
+MafB2_H3K27Ac_hist$H3K27Ac_WT <- rowMeans(MafB2_H3K27Ac_hist[,c('tag_directory_WT.H3K27Ac_R1..Coverage', 'tag_directory_WT.H3K27Ac_R2..Coverage')])
+
+MafB2_H3K27Ac_hist$H3K27Ac_KO <- rowMeans(MafB2_H3K27Ac_hist[,c('tag_directory_KO.H3K27Ac_R1..Coverage', 'tag_directory_KO.H3K27Ac_R2..Coverage')])
+```
+
+```{r fig.height=4, fig.width=3}
+ggplot(data = MafB2_H3K27Ac_hist, aes(x = Distance.from.Center, y = H3K27Ac_WT))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  geom_line(show.legend = FALSE, colour = "red", aes(x = Distance.from.Center, y = H3K27Ac_KO))+
+  ggtitle("H3K27ac at MafB binding sites")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r}
+ggsave("Figure_6D_Hist_H3K27Ac.pdf", height = 4, width = 3)
+```
+
+# Figure 6E
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks.bed mm10 -d tag_directory_WT-H3K27Ac_R1/ tag_directory_WT-H3K27Ac_R2/ tag_directory_KO-H3K27Ac_R1/ tag_directory_KO-H3K27Ac_R2/ > MafB2_H3K27Ac_counts.txt
+```
+
+```{r}
+MafB2_H3K27Ac_counts <- read.table("MafB2_H3K27Ac_counts.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_H3K27Ac_counts)[colnames(MafB2_H3K27Ac_counts) == "PeakID..cmd.annotatePeaks.pl.MafB2_peaks.bed.mm10..d.tag_directory_WT.H3K27Ac_R1..tag_directory_WT.H3K27Ac_R2..tag_directory_KO.H3K27Ac_R1..tag_directory_KO.H3K27Ac_R2.."] <- "PeakID"
+
+colnames(MafB2_H3K27Ac_counts)[colnames(MafB2_H3K27Ac_counts) == "tag_directory_WT.H3K27Ac_R1..Tag.Count.in.given.bp..3449599.0.Total..normalization.factor...2.90..effective.total...10000000."] <- "H3K27Ac_WT_R1"
+
+colnames(MafB2_H3K27Ac_counts)[colnames(MafB2_H3K27Ac_counts) == "tag_directory_WT.H3K27Ac_R2..Tag.Count.in.given.bp..3954896.0.Total..normalization.factor...2.53..effective.total...10000000."] <- "H3K27Ac_WT_R2"
+
+colnames(MafB2_H3K27Ac_counts)[colnames(MafB2_H3K27Ac_counts) == "tag_directory_KO.H3K27Ac_R1..Tag.Count.in.given.bp..3206024.0.Total..normalization.factor...3.12..effective.total...10000000."] <- "H3K27Ac_KO_R1"
+
+colnames(MafB2_H3K27Ac_counts)[colnames(MafB2_H3K27Ac_counts) == "tag_directory_KO.H3K27Ac_R2..Tag.Count.in.given.bp..3641165.0.Total..normalization.factor...2.75..effective.total...10000000."] <- "H3K27Ac_KO_R2"
+```
+
+```{r}
+MafB2_H3K27Ac_counts$H3K27Ac_WT <- rowMeans(MafB2_H3K27Ac_counts[,c('H3K27Ac_WT_R1', 'H3K27Ac_WT_R2')])
+MafB2_H3K27Ac_counts$H3K27Ac_KO <- rowMeans(MafB2_H3K27Ac_counts[,c('H3K27Ac_KO_R1', 'H3K27Ac_KO_R2')])
+
+MafB2_H3K27Ac_counts$log2_H3K27Ac_WT <- log2(MafB2_H3K27Ac_counts$H3K27Ac_WT + 1)
+MafB2_H3K27Ac_counts$log2_H3K27Ac_KO <- log2(MafB2_H3K27Ac_counts$H3K27Ac_KO + 1)
+MafB2_H3K27Ac_counts$below_diag <- MafB2_H3K27Ac_counts$log2_H3K27Ac_KO < MafB2_H3K27Ac_counts$log2_H3K27Ac_WT
+```
+
+```{r fig.height=3.225, fig.width=3}
+ggplot(data = MafB2_H3K27Ac_counts, aes(x = log2_H3K27Ac_WT, y = log2_H3K27Ac_KO)) +
+  geom_point(aes(color = below_diag), show.legend = FALSE) +
+  scale_color_manual(values = c("FALSE" = "red", "TRUE" = "blue")) +
+  geom_abline(slope = 1) +
+  ggtitle("H3K27ac at MafB binding sites") +
+  xlab("Log2(norm tags + 1) \nMafbfl/fl 1") +
+  ylab("Lyz2CreMafbfl/fl \nLog2(norm tags + 1)") +
+  xlim(0, 10) +
+  ylim(0, 10) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks.length = unit(.15, "cm"),
+    panel.border = element_rect(fill = NA, color = "black", linetype = "solid")
+  )
+```
+
+```{r}
+ggsave("Figure_6E_WTvsKO_H3K27ac_Tags.pdf", height = 3.225, width = 3)
+```
+
+# Figure 6F
+
+```{r}
+MafB2_genes <- MafB2_peaks_annot[MafB2_peaks_annot[, 'Distance.to.TSS'] >= -2000 & MafB2_peaks_annot[, 'Distance.to.TSS'] <= 2000, ]
+
+MafB2_genes <- unique(MafB2_genes$Gene.Name)
+MafB2_genes <- na.omit(MafB2_genes)
+```
+
+```{r}
+Mac_sign <- read_excel("Mac_sign.xlsx")
+
+Mac_sign_genes <- Mac_sign$Gene_Symbol
+```
+
+```{r}
+# Helper function to display Venn diagram
+display_venn <- function(x, ...){
+  grid.newpage()
+  venn_object <- venn.diagram(x, filename = NULL, ...)
+  grid.draw(venn_object)
+}
+```
+
+```{r fig.height=4, fig.width=4}
+list <- list(MafB2_target = MafB2_genes, Mac_sign = Mac_sign_genes)
+pdf(file = "Figure_6F_Venn.pdf", width = 4, height = 4)
+display_venn(list, fill = c("red", "blue"))
+dev.off()
+```
+
+# Figure 6H
+
+```{r}
+MafB_Mac_genes <- intersect(MafB2_genes, Mac_sign_genes)
+
+write.table(append(MafB_Mac_genes, "#MafB_Mac_genes", 0), file = "MafB_Mac_genes.grp", row.names = FALSE, col.names = FALSE, quote = FALSE)
+```
+
+
+```{r}
+path = "C:/Users/domie/Documents/CUTandRUN/GSEA_MafB_Mac_genes"
+replotGSEA(path = path, gene.set = "MafB_Mac_genes.grp", class.name = "")
+dev.copy(pdf,"C:/Users/domie/Documents/CUTandRUN/GSEA_MafB_Mac_genes.pdf", width=3, height=3.3)
+dev.off()
+```
+# 
+
+```{r}
+sc <- readRDS("sc.rds")
+
+pal <-c("#6A3D9A", "#CAB2D6", "#E31A1C", "#FB9A99", "#33A02C", "#B2DF8A", "#1F78B4", "#A6CEE3", "#FF7F00", "#FDBF6F", "#FF00FA", "#FFA1FD", "#87421F", "#CDAA7D")
+
+DimPlot(sc, cols = pal)
+```
+
+```{r}
+sc <- AddModuleScore(sc, features = list(MafB_Mac_genes), name = 'MafB_Mac_genes_sign')
+```
+
+
+```{r}
+VlnPlot(sc, features = "MafB_Mac_genes_sign1", cols = pal, pt.size = 0)
+```
+
+```{r}
+metadata <- sc@meta.data
+SPM_metadata <- metadata[metadata$cell.type == "SPM",]
+SPM_MafB <- SPM_metadata[, c("Condition", "MafB_Mac_genes_sign1")]
+```
+
+```{r fig.height=2, fig.width=1.25}
+pal_SPM <- c("#6A3D9A", "#CAB2D6")
+ggplot(SPM_MafB, aes(x = "", y = MafB_Mac_genes_sign1,  fill = Condition)) +
+  introdataviz::geom_split_violin() +
+  stat_summary(fun = mean,
+               geom = "point",
+               position = position_dodge(width = 0.5),
+               size = 1.5, shape = 16, color = "black")+
+  scale_fill_manual(values = pal_SPM)+
+  scale_x_discrete(name = "")+
+  ylab("MafB-Mac target gene signature score")+
+  theme_classic()+
+  theme(legend.position = 'none')
+```
+
+```{r}
+ggsave("VlnPlot_Scoring_MafB-Mac_target_SPM.pdf", width = 1.25, height = 2)
+```
+
+```{r}
+SPM_WT <- metadata[metadata$Condition == "SPM WT",]
+SPM_KO <- metadata[metadata$Condition == "SPM KO",]
+wilcox.test(SPM_WT$MafB_Mac_genes_sign1, SPM_KO$MafB_Mac_genes_sign1)
+```
+
+## LPM
+
+```{r}
+metadata <- sc@meta.data
+LPM_metadata <- metadata[metadata$cell.type == "LPM",]
+LPM_MafB <- LPM_metadata[, c("Condition", "MafB_Mac_genes_sign1")]
+```
+
+```{r fig.height=2, fig.width=1.25}
+pal_LPM <- c("#E31A1C", "#FB9A99")
+ggplot(LPM_MafB, aes(x = "", y = MafB_Mac_genes_sign1,  fill = Condition)) +
+  introdataviz::geom_split_violin() +
+  stat_summary(fun = mean,
+               geom = "point",
+               position = position_dodge(width = 0.5),
+               size = 1.5, shape = 16, color = "black")+
+  scale_fill_manual(values = pal_LPM)+
+  scale_x_discrete(name = "")+
+  ylab("MafB-Mac target gene signature score")+
+  theme_classic()+
+  theme(legend.position = 'none')
+```
+
+```{r}
+ggsave("VlnPlot_Scoring_MafB-Mac_target_LPM.pdf", width = 1.25, height = 2)
+```
+
+```{r}
+LPM_WT <- metadata[metadata$Condition == "LPM WT",]
+LPM_KO <- metadata[metadata$Condition == "LPM KO",]
+wilcox.test(LPM_WT$MafB_Mac_genes_sign1, LPM_KO$MafB_Mac_genes_sign1)
+```
+
+## KC
+
+```{r}
+metadata <- sc@meta.data
+KC_metadata <- metadata[metadata$cell.type == "KC",]
+KC_MafB <- KC_metadata[, c("Condition", "MafB_Mac_genes_sign1")]
+```
+
+```{r fig.height=2, fig.width=1.25}
+pal_KC <- c("#33A02C", "#B2DF8A")
+ggplot(KC_MafB, aes(x = "", y = MafB_Mac_genes_sign1,  fill = Condition)) +
+  introdataviz::geom_split_violin() +
+  stat_summary(fun = mean,
+               geom = "point",
+               position = position_dodge(width = 0.5),
+               size = 1.5, shape = 16, color = "black")+
+  scale_fill_manual(values = pal_KC)+
+  scale_x_discrete(name = "")+
+  ylab("MafB-Mac target gene signature score")+
+  theme_classic()+
+  theme(legend.position = 'none')
+```
+
+```{r}
+ggsave("VlnPlot_Scoring_MafB-Mac_target_KC.pdf", width = 1.25, height = 2)
+```
+
+```{r}
+KC_WT <- metadata[metadata$Condition == "KC WT",]
+KC_KO <- metadata[metadata$Condition == "KC KO",]
+wilcox.test(KC_WT$MafB_Mac_genes_sign1, KC_KO$MafB_Mac_genes_sign1)
+```
+
+## IM
+
+```{r}
+metadata <- sc@meta.data
+IM_metadata <- metadata[metadata$cell.type == "IM",]
+IM_MafB <- IM_metadata[, c("Condition", "MafB_Mac_genes_sign1")]
+```
+
+```{r fig.height=2, fig.width=1.25}
+pal_IM <- c("#1F78B4", "#A6CEE3")
+ggplot(IM_MafB, aes(x = "", y = MafB_Mac_genes_sign1,  fill = Condition)) +
+  introdataviz::geom_split_violin() +
+  stat_summary(fun = mean,
+               geom = "point",
+               position = position_dodge(width = 0.5),
+               size = 1.5, shape = 16, color = "black")+
+  scale_fill_manual(values = pal_IM)+
+  scale_x_discrete(name = "")+
+  ylab("MafB-Mac target gene signature score")+
+  theme_classic()+
+  theme(legend.position = 'none')
+```
+
+```{r}
+ggsave("VlnPlot_Scoring_MafB-Mac_target_IM.pdf", width = 1.25, height = 2)
+```
+
+```{r}
+IM_WT <- metadata[metadata$Condition == "IM WT",]
+IM_KO <- metadata[metadata$Condition == "IM KO",]
+wilcox.test(IM_WT$MafB_Mac_genes_sign1, IM_KO$MafB_Mac_genes_sign1)
+```
+
+## Ly6C CM
+
+```{r}
+metadata <- sc@meta.data
+Ly6C_metadata <- metadata[metadata$cell.type == "Ly6C+ CM",]
+Ly6C_MafB <- Ly6C_metadata[, c("Condition", "MafB_Mac_genes_sign1")]
+```
+
+```{r fig.height=2, fig.width=1.25}
+pal_Ly6C <- c("#FF7F00", "#FDBF6F")
+ggplot(Ly6C_MafB, aes(x = "", y = MafB_Mac_genes_sign1,  fill = Condition)) +
+  introdataviz::geom_split_violin() +
+  stat_summary(fun = mean,
+               geom = "point",
+               position = position_dodge(width = 0.5),
+               size = 1.5, shape = 16, color = "black")+
+  scale_fill_manual(values = pal_Ly6C)+
+  scale_x_discrete(name = "")+
+  ylab("MafB-Mac target gene signature score")+
+  theme_classic()+
+  theme(legend.position = 'none')
+```
+
+```{r}
+ggsave("VlnPlot_Scoring_MafB-Mac_target_Ly6C_CM.pdf", width = 1.25, height = 2)
+```
+
+```{r}
+Ly6C_WT <- metadata[metadata$Condition == "Ly6C+ CM WT",]
+Ly6C_KO <- metadata[metadata$Condition == "Ly6C+ CM KO",]
+wilcox.test(Ly6C_WT$MafB_Mac_genes_sign1, Ly6C_KO$MafB_Mac_genes_sign1)
+```
+
+## MHC2 CM
+
+```{r}
+metadata <- sc@meta.data
+MHC2_metadata <- metadata[metadata$cell.type == "MHC2+ CM",]
+MHC2_MafB <- MHC2_metadata[, c("Condition", "MafB_Mac_genes_sign1")]
+```
+
+```{r fig.height=2, fig.width=1.25}
+pal_MHC2 <- c("#FF00FA", "#FFA1FD")
+ggplot(MHC2_MafB, aes(x = "", y = MafB_Mac_genes_sign1,  fill = Condition)) +
+  introdataviz::geom_split_violin() +
+  stat_summary(fun = mean,
+               geom = "point",
+               position = position_dodge(width = 0.5),
+               size = 1.5, shape = 16, color = "black")+
+  scale_fill_manual(values = pal_MHC2)+
+  scale_x_discrete(name = "")+
+  ylab("MafB-Mac target gene signature score")+
+  theme_classic()+
+  theme(legend.position = 'none')
+```
+
+```{r}
+ggsave("VlnPlot_Scoring_MafB-Mac_target_MHC2_CM.pdf", width = 1.25, height = 2)
+```
+
+```{r}
+MHC2_WT <- metadata[metadata$Condition == "MHC2+ CM WT",]
+MHC2_KO <- metadata[metadata$Condition == "MHC2+ CM KO",]
+wilcox.test(MHC2_WT$MafB_Mac_genes_sign1, MHC2_KO$MafB_Mac_genes_sign1)
+```
+
+## MG
+
+```{r}
+metadata <- sc@meta.data
+MG_metadata <- metadata[metadata$cell.type == "MG",]
+MG_MafB <- MG_metadata[, c("Condition", "MafB_Mac_genes_sign1")]
+```
+
+```{r fig.height=2, fig.width=1.25}
+pal_MG <- c("#87421F", "#CDAA7D")
+ggplot(MG_MafB, aes(x = "", y = MafB_Mac_genes_sign1,  fill = Condition)) +
+  introdataviz::geom_split_violin() +
+  stat_summary(fun = mean,
+               geom = "point",
+               position = position_dodge(width = 0.5),
+               size = 1.5, shape = 16, color = "black")+
+  scale_fill_manual(values = pal_MG)+
+  scale_x_discrete(name = "")+
+  ylab("MafB-Mac target gene signature score")+
+  theme_classic()+
+  theme(legend.position = 'none')
+```
+
+```{r}
+ggsave("VlnPlot_Scoring_MafB-Mac_target_MG.pdf", width = 1.25, height = 2)
+```
+
+
+```{r}
+MG_WT <- metadata[metadata$Condition == "MG WT",]
+MG_KO <- metadata[metadata$Condition == "MG KO",]
+wilcox.test(MG_WT$MafB_Mac_genes_sign1, MG_KO$MafB_Mac_genes_sign1)
+```
