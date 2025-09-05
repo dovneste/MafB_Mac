@@ -1,0 +1,1093 @@
+---
+title: "CUT&RUN BMDM WT vs KO"
+author: "Domien Vanneste"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  header-includes: "-| ```{=latex} \\usepackage{fvextra} \\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+    breaksymbolleft={}, showspaces = false, showtabs = false, breaklines, commandchars=\\\\\\{\\}
+    } ```"
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+\newpage
+
+# Introduction
+Despite substantial evidence pointing to MafB as an essential regulator of core mac identity, the genes it directly controls and the mechanisms underlying this regulation remain poorly understood. To address this question, we performed  cleavage under targets and release using nuclease (CUT&RUN) for MafB on BMDMs from Mafbfl/fl and Lyz2CreMafbfl/fl mice. MafB and H3K27ac CUT&RUN was performed with a CUTANA ChIC/CUT&RUN Kit (EpiCypher, 141048) according to manufacturer’s instructions, with modifications. BMDMs from Mafbfl/fl or Lyz2CreMafbfl/fl mice were washed with ice-cold PBS and fixed with 0.1 % formaldehyde in PBS for 2 min at room temperature. Fixation was quenched by adding glycine (Merck, 104691000) to 0.125 M.  For each CUT&RUN sample, 1 x 10^6 fixed cells and 0.5 µg antibodies were added:
+
+IgG (EpiCypher, 13-0042)
+
+MafB1 (Sigma, HPA005653)
+MafB2 (Cell Signaling Technology, 41019)
+MafB3 (Proteintech, 20189-1-AP)
+
+H3K27ac (Thermo Fisher Scientific, MA5-23516).
+
+CUT&RUN libraries were prepared with a CUTANA™ CUT&RUN Library Prep Kit (EpiCypher, 141001) according to manufacturer’s instructions. These libraries were sequenced on an NovaSeq 6000 (Illumina) sequencer on an S4 flow cell at 10 million reads per sample.
+
+\newpage
+
+# Load Packages
+
+```{r}
+suppressMessages({
+library(ggplot2)
+library(colorRamp2)
+library(ComplexHeatmap)
+library(readxl)
+library(futile.logger)
+library(grid)
+library(rtracklayer)
+library(dplyr)
+})
+```
+
+# nf-core/cutandrun
+
+The command used to launch the workflow was as follows:
+```{bash eval = FALSE}
+nextflow run nf-core/cutandrun --input sample_list_all.csv --gtf genes.gtf --fasta genome.fa --peakcaller seacr -profile docker --outdir results_BMDM_WTvsKO/
+```
+
+# Homer
+
+## Create "Tag Directory" with makeTagDirectory
+```{bash eval = FALSE}
+#IgG 
+makeTagDirectory IgG_WT_R1/ IgG_WT_R1.target.markdup.sorted.bam
+makeTagDirectory IgG_KO_R1/ IgG_KO_R1.target.markdup.sorted.bam
+
+#MafB1
+makeTagDirectory MafB1_WT_R1/ MafB1_WT_R1.target.markdup.sorted.bam
+makeTagDirectory MafB1_WT_R2/ MafB1_WT_R2.target.markdup.sorted.bam
+makeTagDirectory MafB1_KO_R1/ MafB1_KO_R1.target.markdup.sorted.bam
+makeTagDirectory MafB1_KO_R2/ MafB1_KO_R2.target.markdup.sorted.bam
+
+#MafB2
+makeTagDirectory MafB2_WT_R1/ MafB2_WT_R1.target.markdup.sorted.bam
+makeTagDirectory MafB2_WT_R2/ MafB2_WT_R2.target.markdup.sorted.bam
+makeTagDirectory MafB2_KO_R1/ MafB2_KO_R1.target.markdup.sorted.bam
+makeTagDirectory MafB2_KO_R2/ MafB2_KO_R2.target.markdup.sorted.bam
+
+#MafB3
+makeTagDirectory MafB3_WT_R1/ MafB3_WT_R1.target.markdup.sorted.bam
+makeTagDirectory MafB3_WT_R2/ MafB3_WT_R2.target.markdup.sorted.bam
+makeTagDirectory MafB3_KO_R1/ MafB3_KO_R1.target.markdup.sorted.bam
+makeTagDirectory MafB3_KO_R2/ MafB3_KO_R2.target.markdup.sorted.bam
+```
+
+## QC: Tag quantification and distribution
+
+### MafB1
+```{r}
+MafB1_peaks_rep1 <- read.table("MafB1_WT_R1.seacr.peaks.stringent.bed", header = FALSE, sep = "\t")
+
+MafB1_peaks_rep2 <- read.table("MafB1_WT_R2.seacr.peaks.stringent.bed", header = FALSE, sep = "\t")
+
+MafB1_peaks_consensus <- read.table("MafB1_WT.seacr.consensus.peak_counts.bed", header = FALSE, sep = "\t")
+```
+
+```{r}
+#peaks rep1
+nrow(MafB1_peaks_rep1)
+
+#peaks rep2
+nrow(MafB1_peaks_rep2)
+
+#consensus peaks
+nrow(MafB1_peaks_consensus)
+
+#shared peaks
+length(which(MafB1_peaks_consensus[,10] == 2))
+```
+
+```{r}
+MafB1_peaks_merged <- MafB1_peaks_consensus[MafB1_peaks_consensus[,10] == 2, ]
+
+split_scores <- strsplit(as.character(MafB1_peaks_merged$V6), ",")
+
+means <- sapply(split_scores, function(x) {
+  if (all(is.na(x))) return(NA_real_)
+  nums <- as.numeric(x)
+  mean(nums, na.rm = TRUE)
+})
+
+MafB1_peaks_merged$V4 <- means
+
+write.table(MafB1_peaks_merged, "MafB1_peaks_merged.bed", sep="\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB1_peaks_merged.bed mm10 -d MafB1_WT_R1/ MafB1_WT_R2/ MafB1_KO_R1/ MafB1_KO_R2/ > MafB1_counts.txt
+```
+
+```{r}
+MafB1_counts <- read.table("MafB1_counts.txt", header = TRUE, sep = "\t")
+
+colnames(MafB1_counts)[colnames(MafB1_counts) == "PeakID..cmd.annotatePeaks.pl.MafB1_peaks_merged.bed.mm10..d.MafB1_WT_R1..MafB1_WT_R2..MafB1_KO_R1..MafB1_KO_R2.."] <- "PeakID"
+
+colnames(MafB1_counts)[colnames(MafB1_counts) == "MafB1_WT_R1..Tag.Count.in.given.bp..5125124.0.Total..normalization.factor...1.95..effective.total...10000000."] <- "MafB1_WT_R1"
+
+colnames(MafB1_counts)[colnames(MafB1_counts) == "MafB1_WT_R2..Tag.Count.in.given.bp..5218170.0.Total..normalization.factor...1.92..effective.total...10000000."] <- "MafB1_WT_R2"
+
+colnames(MafB1_counts)[colnames(MafB1_counts) == "MafB1_KO_R1..Tag.Count.in.given.bp..5819980.0.Total..normalization.factor...1.72..effective.total...10000000."] <- "MafB1_KO_R1"
+
+colnames(MafB1_counts)[colnames(MafB1_counts) == "MafB1_KO_R2..Tag.Count.in.given.bp..5208759.0.Total..normalization.factor...1.92..effective.total...10000000."] <- "MafB1_KO_R2"
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB1_counts, aes(x =MafB1_WT_R1, y =MafB1_WT_R2))+
+  geom_point(show.legend = FALSE, colour = "blue")+
+  geom_abline(slope = 1)+
+  ggtitle("Mafbfl/fl")+
+  xlab("Norm tags \nRep. 1")+
+  ylab("Rep. 2 \nNorm tags")+
+  xlim(0,850)+
+  ylim(0,850)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB1_counts, aes(x =log2(MafB1_WT_R1+1), y =log2(MafB1_WT_R2+1)))+
+  geom_point(show.legend = FALSE, colour = "blue")+
+  geom_abline(slope = 1)+
+  ggtitle("Mafbfl/fl")+
+  xlab("Log2(norm tags + 1) \nRep. 1")+
+  ylab("Rep. 2 \nLog2(norm tags + 1)")+
+  xlim(0,10)+
+  ylim(0,10)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB1_counts, aes(x =MafB1_KO_R1, y =MafB1_KO_R2))+
+  geom_point(show.legend = FALSE, colour = "red")+
+  geom_abline(slope = 1)+
+  ggtitle("Lyz2CreMafbfl/fl")+
+  xlab("Norm tags + 1) \nRep. 1")+
+  ylab("Rep. 2 \nNorm tags")+
+  xlim(0,850)+
+  ylim(0,850)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB1_counts, aes(x =log2(MafB1_KO_R1+1), y =log2(MafB1_KO_R2+1)))+
+  geom_point(show.legend = FALSE, colour = "red")+
+  geom_abline(slope = 1)+
+  ggtitle("Lyz2CreMafbfl/fl")+
+  xlab("Log2(norm tags + 1) \nRep. 1")+
+  ylab("Rep. 2 \nLog2(norm tags + 1)")+
+  xlim(0,10)+
+  ylim(0,10)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB1_peaks_merged.bed mm10 -size 4000 -hist 10 -d MafB1_WT_R1/ MafB1_WT_R2/ MafB1_KO_R1/ MafB1_KO_R2/ > MafB1_hist.txt
+```
+
+```{r}
+MafB1_hist <- read.table("MafB1_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB1_hist)[colnames(MafB1_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB1_peaks_merged.bed.mm10..size.4000..hist.10..d.MafB1_WT_R1..MafB1_WT_R2..MafB1_KO_R1..MafB1_KO_R2.."] <- "Distance.from.Center"
+
+MafB1_hist$MafB1_WT <- rowMeans(MafB1_hist[,c('MafB1_WT_R1..Coverage', 'MafB1_WT_R2..Coverage')])
+
+MafB1_hist$MafB1_KO <- rowMeans(MafB1_hist[,c('MafB1_KO_R1..Coverage', 'MafB1_KO_R2..Coverage')])
+```
+
+```{r fig.height=4, fig.width=3}
+ggplot(data = MafB1_hist, aes(x = Distance.from.Center, y = MafB1_WT))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  geom_line(show.legend = FALSE, colour = "red", aes(x = Distance.from.Center, y = MafB1_KO))+
+  ggtitle("MafB1 peaks")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB1_peaks_merged.bed mm10 -size 4000 -hist 25 -ghist -d MafB1_WT_R1/ MafB1_WT_R2/ MafB1_KO_R1/ MafB1_KO_R2/ > MafB1_heatmap.txt
+```
+
+
+```{r}
+MafB1_heatmap <- read.table("MafB1_heatmap.txt", header = TRUE, check.names = FALSE, sep = "\t")
+
+MafB1_WT_R1_heatmap <- MafB1_heatmap[, 2:162]
+MafB1_WT_R2_heatmap <- MafB1_heatmap[, 163:323]
+MafB1_WT_heatmap <- (MafB1_WT_R1_heatmap+MafB1_WT_R2_heatmap)/2
+
+MafB1_KO_R1_heatmap <- MafB1_heatmap[, 324:484]
+MafB1_KO_R2_heatmap <- MafB1_heatmap[, 485:645]
+MafB1_KO_heatmap <- (MafB1_KO_R1_heatmap+MafB1_KO_R2_heatmap)/2
+```
+
+```{r fig.height=4, fig.width=2}
+col_fun = colorRamp2(c(0, 15), c( "white", "red"))
+
+Heatmap(MafB1_WT_heatmap, col_fun, cluster_columns = F, cluster_rows = F, heatmap_legend_param = list(title = "Tags"), use_raster = TRUE, raster_quality = 10, column_title = "Mafbfl/fl")
+```
+
+```{r fig.height=4, fig.width=2}
+col_fun = colorRamp2(c(0, 15), c( "white", "red"))
+
+Heatmap(MafB1_KO_heatmap, col_fun, cluster_columns = F, cluster_rows = F, heatmap_legend_param = list(title = "Tags"), use_raster = TRUE, raster_quality = 10, , column_title = "LyzCreMafbfl/fl")
+```
+
+### MafB2
+```{r}
+MafB2_peaks_rep1 <- read.table("MafB2_WT_R1.seacr.peaks.stringent.bed", header = FALSE, sep = "\t")
+
+MafB2_peaks_rep2 <- read.table("MafB2_WT_R2.seacr.peaks.stringent.bed", header = FALSE, sep = "\t")
+
+MafB2_peaks_consensus <- read.table("MafB2_WT.seacr.consensus.peak_counts.bed", header = FALSE, sep = "\t")
+```
+
+
+```{r}
+#peaks rep1
+nrow(MafB2_peaks_rep1)
+
+#peaks rep2
+nrow(MafB2_peaks_rep2)
+
+#consensus peaks
+nrow(MafB2_peaks_consensus)
+
+#shared peaks
+length(which(MafB2_peaks_consensus[,10] == 2))
+```
+
+```{r}
+MafB2_peaks_merged <- MafB2_peaks_consensus[MafB2_peaks_consensus[,10] == 2, ]
+
+split_scores <- strsplit(as.character(MafB2_peaks_merged$V6), ",")
+
+means <- sapply(split_scores, function(x) {
+  if (all(is.na(x))) return(NA_real_)
+  nums <- as.numeric(x)
+  mean(nums, na.rm = TRUE)
+})
+
+MafB2_peaks_merged$V4 <- means
+
+write.table(MafB2_peaks_merged, "MafB2_peaks_merged.bed", sep="\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks_merged.bed mm10 -d MafB2_WT_R1/ MafB2_WT_R2/ MafB2_KO_R1/ MafB2_KO_R2/ > MafB2_counts.txt
+```
+
+```{r}
+MafB2_counts <- read.table("MafB2_counts.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "PeakID..cmd.annotatePeaks.pl.MafB2_peaks_merged.bed.mm10..d.MafB2_WT_R1..MafB2_WT_R2..MafB2_KO_R1..MafB2_KO_R2.."] <- "PeakID"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_WT_R1..Tag.Count.in.given.bp..5577784.0.Total..normalization.factor...1.79..effective.total...10000000."] <- "MafB2_WT_R1"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_WT_R2..Tag.Count.in.given.bp..6205913.0.Total..normalization.factor...1.61..effective.total...10000000."] <- "MafB2_WT_R2"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_KO_R1..Tag.Count.in.given.bp..5444540.0.Total..normalization.factor...1.84..effective.total...10000000."] <- "MafB2_KO_R1"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_KO_R2..Tag.Count.in.given.bp..6810425.0.Total..normalization.factor...1.47..effective.total...10000000."] <- "MafB2_KO_R2"
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB2_counts, aes(x =MafB2_WT_R1, y =MafB2_WT_R2))+
+  geom_point(show.legend = FALSE, colour = "blue")+
+  geom_abline(slope = 1)+
+  ggtitle("Mafbfl/fl")+
+  xlab("Norm tags \nRep. 1")+
+  ylab("Rep. 2 \nNorm tags")+
+  xlim(0,850)+
+  ylim(0,850)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB2_counts, aes(x =log2(MafB2_WT_R1+1), y =log2(MafB2_WT_R2+1)))+
+  geom_point(show.legend = FALSE, colour = "blue")+
+  geom_abline(slope = 1)+
+  ggtitle("Mafbfl/fl")+
+  xlab("Log2(norm tags + 1) \nRep. 1")+
+  ylab("Rep. 2 \nLog2(norm tags + 1)")+
+  xlim(0,10)+
+  ylim(0,10)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB2_counts, aes(x =MafB2_KO_R1, y =MafB2_KO_R2))+
+  geom_point(show.legend = FALSE, colour = "red")+
+  geom_abline(slope = 1)+
+  ggtitle("Lyz2CreMafbfl/fl")+
+  xlab("Norm tags \nRep. 1")+
+  ylab("Rep. 2 \nNorm tags")+
+  xlim(0,850)+
+  ylim(0,850)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB2_counts, aes(x =log2(MafB2_KO_R1+1), y =log2(MafB2_KO_R2+1)))+
+  geom_point(show.legend = FALSE, colour = "red")+
+  geom_abline(slope = 1)+
+  ggtitle("Lyz2CreMafbfl/fl")+
+  xlab("Log2(norm tags + 1) \nRep. 1")+
+  ylab("Rep. 2 \nLog2(norm tags + 1)")+
+  xlim(0,10)+
+  ylim(0,10)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks_merged.bed mm10 -size 4000 -hist 10 -d MafB2_WT_R1/ MafB2_WT_R2/ MafB2_KO_R1/ MafB2_KO_R2/ > MafB2_hist.txt
+```
+
+```{r}
+MafB2_hist <- read.table("MafB2_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_hist)[colnames(MafB2_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB2_peaks_merged.bed.mm10..size.4000..hist.10..d.MafB2_WT_R1..MafB2_WT_R2..MafB2_KO_R1..MafB2_KO_R2.."] <- "Distance.from.Center"
+
+MafB2_hist$MafB2_WT <- rowMeans(MafB2_hist[,c('MafB2_WT_R1..Coverage', 'MafB2_WT_R2..Coverage')])
+
+MafB2_hist$MafB2_KO <- rowMeans(MafB2_hist[,c('MafB2_KO_R1..Coverage', 'MafB2_KO_R2..Coverage')])
+```
+
+```{r fig.height=4, fig.width=3}
+ggplot(data = MafB2_hist, aes(x = Distance.from.Center, y = MafB2_WT))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  geom_line(show.legend = FALSE, colour = "red", aes(x = Distance.from.Center, y = MafB2_KO))+
+  ggtitle("MafB2 peaks")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks_merged.bed mm10 -size 4000 -hist 25 -ghist -d MafB2_WT_R1/ MafB2_WT_R2/ MafB2_KO_R1/ MafB2_KO_R2/ > MafB2_heatmap.txt
+```
+
+
+```{r}
+MafB2_heatmap <- read.table("MafB2_heatmap.txt", header = TRUE, check.names = FALSE, sep = "\t")
+
+MafB2_WT_R1_heatmap <- MafB2_heatmap[, 2:162]
+MafB2_WT_R2_heatmap <- MafB2_heatmap[, 163:323]
+MafB2_WT_heatmap <- (MafB2_WT_R1_heatmap+MafB2_WT_R2_heatmap)/2
+
+MafB2_KO_R1_heatmap <- MafB2_heatmap[, 324:484]
+MafB2_KO_R2_heatmap <- MafB2_heatmap[, 485:645]
+MafB2_KO_heatmap <- (MafB2_KO_R1_heatmap+MafB2_KO_R2_heatmap)/2
+```
+
+```{r fig.height=4, fig.width=2}
+col_fun = colorRamp2(c(0, 15), c( "white", "red"))
+
+Heatmap(MafB2_WT_heatmap, col_fun, cluster_columns = F, cluster_rows = F, heatmap_legend_param = list(title = "Tags"), use_raster = TRUE, raster_quality = 10, column_title = "Mafbfl/fl")
+```
+
+
+```{r fig.height=4, fig.width=2}
+col_fun = colorRamp2(c(0, 15), c( "white", "red"))
+
+Heatmap(MafB2_KO_heatmap, col_fun, cluster_columns = F, cluster_rows = F, heatmap_legend_param = list(title = "Tags"), use_raster = TRUE, raster_quality = 10, , column_title = "LyzCreMafbfl/fl")
+```
+
+### MafB3
+```{r}
+MafB3_peaks_rep1 <- read.table("MafB3_WT_R1.seacr.peaks.stringent.bed", header = FALSE, sep = "\t")
+
+MafB3_peaks_rep2 <- read.table("MafB3_WT_R2.seacr.peaks.stringent.bed", header = FALSE, sep = "\t")
+
+MafB3_peaks_consensus <- read.table("MafB3_WT.seacr.consensus.peak_counts.bed", header = FALSE, sep = "\t")
+```
+
+```{r}
+#peaks rep1
+nrow(MafB3_peaks_rep1)
+
+#peaks rep2
+nrow(MafB3_peaks_rep2)
+
+#consensus peaks
+nrow(MafB3_peaks_consensus)
+
+#shared peaks
+length(which(MafB3_peaks_consensus[,10] == 2))
+```
+
+```{r}
+MafB3_peaks_merged <- MafB3_peaks_consensus[MafB3_peaks_consensus[,10] == 2, ]
+
+split_scores <- strsplit(as.character(MafB3_peaks_merged$V6), ",")
+
+means <- sapply(split_scores, function(x) {
+  if (all(is.na(x))) return(NA_real_)
+  nums <- as.numeric(x)
+  mean(nums, na.rm = TRUE)
+})
+
+MafB3_peaks_merged$V4 <- means
+
+write.table(MafB3_peaks_merged, "MafB3_peaks_merged.bed", sep="\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB3_peaks_merged.bed mm10 -d MafB3_WT_R1/ MafB3_WT_R2/ MafB3_KO_R1/ MafB3_KO_R2/ > MafB3_counts.txt
+```
+
+```{r}
+MafB3_counts <- read.table("MafB3_counts.txt", header = TRUE, sep = "\t")
+
+colnames(MafB3_counts)[colnames(MafB3_counts) == "PeakID..cmd.annotatePeaks.pl.MafB3_peaks_merged.bed.mm10..d.MafB3_WT_R1..MafB3_WT_R2..MafB3_KO_R1..MafB3_KO_R2.."] <- "PeakID"
+
+colnames(MafB3_counts)[colnames(MafB3_counts) == "MafB3_WT_R1..Tag.Count.in.given.bp..6327645.0.Total..normalization.factor...1.58..effective.total...10000000."] <- "MafB3_WT_R1"
+
+colnames(MafB3_counts)[colnames(MafB3_counts) == "MafB3_WT_R2..Tag.Count.in.given.bp..4832571.0.Total..normalization.factor...2.07..effective.total...10000000."] <- "MafB3_WT_R2"
+
+colnames(MafB3_counts)[colnames(MafB3_counts) == "MafB3_KO_R1..Tag.Count.in.given.bp..6875061.0.Total..normalization.factor...1.45..effective.total...10000000."] <- "MafB3_KO_R1"
+
+colnames(MafB3_counts)[colnames(MafB3_counts) == "MafB3_KO_R2..Tag.Count.in.given.bp..6527343.0.Total..normalization.factor...1.53..effective.total...10000000."] <- "MafB3_KO_R2"
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB3_counts, aes(x =MafB3_WT_R1, y =MafB3_WT_R2))+
+  geom_point(show.legend = FALSE, colour = "blue")+
+  geom_abline(slope = 1)+
+  ggtitle("Mafbfl/fl")+
+  xlab("Norm tags \nRep. 1")+
+  ylab("Rep. 2 \nNorm tags")+
+  xlim(0,850)+
+  ylim(0,850)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB3_counts, aes(x =log2(MafB3_WT_R1+1), y =log2(MafB3_WT_R2+1)))+
+  geom_point(show.legend = FALSE, colour = "blue")+
+  geom_abline(slope = 1)+
+  ggtitle("Mafbfl/fl")+
+  xlab("Log2(norm tags + 1) \nRep. 1")+
+  ylab("Rep. 2 \nLog2(norm tags + 1)")+
+  xlim(0,10)+
+  ylim(0,10)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB3_counts, aes(x =MafB3_KO_R1, y =MafB3_KO_R2))+
+  geom_point(show.legend = FALSE, colour = "red")+
+  geom_abline(slope = 1)+
+  ggtitle("Lyz2CreMafbfl/fl")+
+  xlab("Norm tags \nRep. 1")+
+  ylab("Rep. 2 \nNorm tags")+
+  xlim(0,850)+
+  ylim(0,850)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB3_counts, aes(x =log2(MafB3_KO_R1+1), y =log2(MafB3_KO_R2+1)))+
+  geom_point(show.legend = FALSE, colour = "red")+
+  geom_abline(slope = 1)+
+  ggtitle("Lyz2CreMafbfl/fl")+
+  xlab("Log2(norm tags + 1) \nRep. 1")+
+  ylab("Rep. 2 \nLog2(norm tags + 1)")+
+  xlim(0,10)+
+  ylim(0,10)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks_merged.bed mm10 -size 4000 -hist 10 -d MafB2_WT_R1/ MafB2_WT_R2/ MafB2_KO_R1/ MafB2_KO_R2/ > MafB2_hist.txt
+```
+
+```{r}
+MafB3_hist <- read.table("MafB3_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB3_hist)[colnames(MafB3_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB3_peaks_merged.bed.mm10..size.4000..hist.10..d.MafB3_WT_R1..MafB3_WT_R2..MafB3_KO_R1..MafB3_KO_R2."] <- "Distance.from.Center"
+
+MafB3_hist$MafB3_WT <- rowMeans(MafB3_hist[,c('MafB3_WT_R1..Coverage', 'MafB3_WT_R2..Coverage')])
+
+MafB3_hist$MafB3_KO <- rowMeans(MafB3_hist[,c('MafB3_KO_R1..Coverage', 'MafB3_KO_R2.Coverage')])
+```
+
+```{r fig.height=4, fig.width=3}
+ggplot(data = MafB3_hist, aes(x = Distance.from.Center, y = MafB3_WT))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  geom_line(show.legend = FALSE, colour = "red", aes(x = Distance.from.Center, y = MafB3_KO))+
+  ggtitle("MafB3 peaks")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB3_peaks_merged.bed mm10 -size 4000 -hist 25 -ghist -d MafB3_WT_R1/ MafB3_WT_R2/ MafB3_KO_R1/ MafB3_KO_R2/ > MafB3_heatmap.txt
+```
+
+
+```{r}
+MafB3_heatmap <- read.table("MafB3_heatmap.txt", header = TRUE, check.names = FALSE, sep = "\t")
+
+MafB3_WT_R1_heatmap <- MafB3_heatmap[, 2:162]
+MafB3_WT_R2_heatmap <- MafB3_heatmap[, 163:323]
+MafB3_WT_heatmap <- (MafB3_WT_R1_heatmap+MafB3_WT_R2_heatmap)/2
+
+MafB3_KO_R1_heatmap <- MafB3_heatmap[, 324:484]
+MafB3_KO_R2_heatmap <- MafB3_heatmap[, 485:645]
+MafB3_KO_heatmap <- (MafB3_KO_R1_heatmap+MafB3_KO_R2_heatmap)/2
+```
+
+```{r fig.height=4, fig.width=2}
+col_fun = colorRamp2(c(0, 15), c( "white", "red"))
+
+Heatmap(MafB3_WT_heatmap, col_fun, cluster_columns = F, cluster_rows = F, heatmap_legend_param = list(title = "Tags"), use_raster = TRUE, raster_quality = 10, column_title = "Mafbfl/fl")
+```
+
+```{r fig.height=4, fig.width=2}
+col_fun = colorRamp2(c(0, 15), c( "white", "red"))
+
+Heatmap(MafB3_KO_heatmap, col_fun, cluster_columns = F, cluster_rows = F, heatmap_legend_param = list(title = "Tags"), use_raster = TRUE, raster_quality = 10, , column_title = "LyzCreMafbfl/fl")
+```
+
+## Peak selection (WT vs KO)
+
+### MafB1
+```{r}
+MafB1_counts$MafB1_WT <- rowMeans(MafB1_counts[,c('MafB1_WT_R1', 'MafB1_WT_R2')])
+MafB1_counts$MafB1_KO <- rowMeans(MafB1_counts[,c('MafB1_KO_R1', 'MafB1_KO_R2')])
+
+MafB1_counts$log2_MafB1_WT <- log2(MafB1_counts$MafB1_WT + 1)
+MafB1_counts$log2_MafB1_KO <- log2(MafB1_counts$MafB1_KO + 1)
+MafB1_counts$below_diag <- MafB1_counts$log2_MafB1_KO < MafB1_counts$log2_MafB1_WT
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB1_counts, aes(x = log2_MafB1_WT, y = log2_MafB1_KO)) +
+  geom_point(aes(color = below_diag), show.legend = FALSE) +
+  scale_color_manual(values = c("FALSE" = "red", "TRUE" = "blue")) +
+  geom_abline(slope = 1) +
+  ggtitle("MafB1 Peaks") +
+  xlab("Log2(norm tags + 1) \nMafbfl/fl 1") +
+  ylab("Lyz2CreMafbfl/fl \nLog2(norm tags + 1)") +
+  xlim(0, 10) +
+  ylim(0, 10) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks.length = unit(.15, "cm"),
+    panel.border = element_rect(fill = NA, color = "black", linetype = "solid")
+  )
+```
+
+
+```{r}
+MafB1_PeakID <- c(MafB1_counts[MafB1_counts[,'below_diag'] == "TRUE", ]$PeakID)
+MafB1_peaks <- MafB1_peaks_merged[MafB1_peaks_merged[, 4] %in% MafB1_PeakID, ]
+
+write.table(MafB1_peaks, "MafB1_peaks.bed", sep="\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+### MafB2
+```{r}
+MafB2_counts$MafB2_WT <- rowMeans(MafB2_counts[,c('MafB2_WT_R1', 'MafB2_WT_R2')])
+MafB2_counts$MafB2_KO <- rowMeans(MafB2_counts[,c('MafB2_KO_R1', 'MafB2_KO_R2')])
+
+MafB2_counts$log2_MafB2_WT <- log2(MafB2_counts$MafB2_WT + 1)
+MafB2_counts$log2_MafB2_KO <- log2(MafB2_counts$MafB2_KO + 1)
+MafB2_counts$below_diag <- MafB2_counts$log2_MafB2_KO < MafB2_counts$log2_MafB2_WT
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB2_counts, aes(x = log2_MafB2_WT, y = log2_MafB2_KO)) +
+  geom_point(aes(color = below_diag), show.legend = FALSE) +
+  scale_color_manual(values = c("FALSE" = "red", "TRUE" = "blue")) +
+  geom_abline(slope = 1) +
+  ggtitle("MafB2 Peaks") +
+  xlab("Log2(norm tags + 1) \nMafbfl/fl") +
+  ylab("Lyz2CreMafbfl/fl \nLog2(norm tags + 1)") +
+  xlim(0, 10) +
+  ylim(0, 10) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks.length = unit(.15, "cm"),
+    panel.border = element_rect(fill = NA, color = "black", linetype = "solid")
+  )
+```
+
+
+```{r}
+MafB2_PeakID <- c(MafB2_counts[MafB2_counts[,'below_diag'] == "TRUE", ]$PeakID)
+MafB2_peaks <- MafB2_peaks_merged[MafB2_peaks_merged[, 4] %in% MafB2_PeakID, ]
+
+write.table(MafB2_peaks, "MafB2_peaks.bed", sep="\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+### MafB3
+```{r}
+MafB3_counts$MafB3_WT <- rowMeans(MafB3_counts[,c('MafB3_WT_R1', 'MafB3_WT_R2')])
+MafB3_counts$MafB3_KO <- rowMeans(MafB3_counts[,c('MafB3_KO_R1', 'MafB3_KO_R2')])
+
+MafB3_counts$log2_MafB3_WT <- log2(MafB3_counts$MafB3_WT + 1)
+MafB3_counts$log2_MafB3_KO <- log2(MafB3_counts$MafB3_KO + 1)
+MafB3_counts$below_diag <- MafB3_counts$log2_MafB3_KO < MafB3_counts$log2_MafB3_WT
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB3_counts, aes(x = log2_MafB3_WT, y = log2_MafB3_KO)) +
+  geom_point(aes(color = below_diag), show.legend = FALSE) +
+  scale_color_manual(values = c("FALSE" = "red", "TRUE" = "blue")) +
+  geom_abline(slope = 1) +
+  ggtitle("MafB3 Peaks") +
+  xlab("Log2(norm tags + 1) \nMafbfl/fl") +
+  ylab("Lyz2CreMafbfl/fl \nLog2(norm tags + 1)") +
+  xlim(0, 10) +
+  ylim(0, 10) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks.length = unit(.15, "cm"),
+    panel.border = element_rect(fill = NA, color = "black", linetype = "solid")
+  )
+```
+
+```{r}
+MafB3_PeakID <- c(MafB3_counts[MafB3_counts[,'below_diag'] == "TRUE", ]$PeakID)
+MafB3_peaks <- MafB3_peaks_merged[MafB3_peaks_merged[, 4] %in% MafB3_PeakID, ]
+
+write.table(MafB3_peaks, "MafB3_peaks.bed", sep="\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+## Annotate Peaks
+
+### MafB1
+```{bash eval = FALSE}
+annotatePeaks.pl MafB1_peaks.bed genome.fa -gtf genes.gtf > MafB1_peaks_annot.txt
+```
+
+```{r}
+MafB1_peaks_annot <- read.table("MafB1_peaks_annot.txt", header = TRUE, sep = "\t")
+```
+
+```{r}
+MafB1_peaks_annot$Annotation.not.detailed <- sub(" .*", "", MafB1_peaks_annot$Annotation)
+
+table(MafB1_peaks_annot$Annotation.not.detailed)
+```
+
+
+### MafB2
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks.bed genome.fa -gtf genes.gtf > MafB2_peaks_annot.txt
+```
+
+```{r}
+MafB2_peaks_annot <- read.table("MafB2_peaks_annot.txt", header = TRUE, sep = "\t")
+```
+
+```{r}
+MafB2_peaks_annot$Annotation.not.detailed <- sub(" .*", "", MafB2_peaks_annot$Annotation)
+
+table(MafB2_peaks_annot$Annotation.not.detailed)
+```
+
+### MafB3
+```{bash eval = FALSE}
+annotatePeaks.pl MafB3_peaks.bed genome.fa -gtf genes.gtf > MafB3_peaks_annot.txt
+```
+
+```{r}
+MafB3_peaks_annot <- read.table("MafB3_peaks_annot.txt", header = TRUE, sep = "\t")
+```
+
+```{r}
+MafB3_peaks_annot$Annotation.not.detailed <- sub(" .*", "", MafB3_peaks_annot$Annotation)
+
+table(MafB3_peaks_annot$Annotation.not.detailed)
+```
+
+## H3K27Ac at MafB peaks
+
+### MafB1
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB1_peaks.bed mm10 -size 4000 -hist 10 -d tag_directory_WT-H3K27Ac_R1/ tag_directory_WT-H3K27Ac_R2/ tag_directory_KO-H3K27Ac_R1/ tag_directory_KO-H3K27Ac_R2/ > MafB1_H3K27Ac_hist.txt
+```
+
+```{r}
+MafB1_H3K27Ac_hist <- read.table("MafB1_H3K27Ac_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB1_H3K27Ac_hist)[colnames(MafB1_H3K27Ac_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB1_peaks.bed.mm10..size.4000..hist.10..d.tag_directory_WT.H3K27Ac_R1..tag_directory_WT.H3K27Ac_R2..tag_directory_KO.H3K27Ac_R1..tag_directory_KO.H3K27Ac_R2.."] <- "Distance.from.Center"
+
+MafB1_H3K27Ac_hist$H3K27Ac_WT <- rowMeans(MafB1_H3K27Ac_hist[,c('tag_directory_WT.H3K27Ac_R1..Coverage', 'tag_directory_WT.H3K27Ac_R2..Coverage')])
+
+MafB1_H3K27Ac_hist$H3K27Ac_KO <- rowMeans(MafB1_H3K27Ac_hist[,c('tag_directory_KO.H3K27Ac_R1..Coverage', 'tag_directory_KO.H3K27Ac_R2..Coverage')])
+```
+
+```{r fig.height=4, fig.width=3}
+ggplot(data = MafB1_H3K27Ac_hist, aes(x = Distance.from.Center, y = H3K27Ac_WT))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  geom_line(show.legend = FALSE, colour = "red", aes(x = Distance.from.Center, y = H3K27Ac_KO))+
+  ggtitle("H3K27ac at MafB1 peaks")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB1_peaks.bed mm10 -d tag_directory_WT-H3K27Ac_R1/ tag_directory_WT-H3K27Ac_R2/ tag_directory_KO-H3K27Ac_R1/ tag_directory_KO-H3K27Ac_R2/ > MafB1_H3K27Ac_counts.txt
+```
+
+```{r}
+MafB1_H3K27Ac_counts <- read.table("MafB1_H3K27Ac_counts.txt", header = TRUE, sep = "\t")
+
+colnames(MafB1_H3K27Ac_counts)[colnames(MafB1_H3K27Ac_counts) == "PeakID..cmd.annotatePeaks.pl.MafB1_peaks.bed.mm10..d.tag_directory_WT.H3K27Ac_R1..tag_directory_WT.H3K27Ac_R2..tag_directory_KO.H3K27Ac_R1..tag_directory_KO.H3K27Ac_R2.."] <- "PeakID"
+
+colnames(MafB1_H3K27Ac_counts)[colnames(MafB1_H3K27Ac_counts) == "tag_directory_WT.H3K27Ac_R1..Tag.Count.in.given.bp..3449599.0.Total..normalization.factor...2.90..effective.total...10000000."] <- "H3K27Ac_WT_R1"
+
+colnames(MafB1_H3K27Ac_counts)[colnames(MafB1_H3K27Ac_counts) == "tag_directory_WT.H3K27Ac_R2..Tag.Count.in.given.bp..3954896.0.Total..normalization.factor...2.53..effective.total...10000000."] <- "H3K27Ac_WT_R2"
+
+colnames(MafB1_H3K27Ac_counts)[colnames(MafB1_H3K27Ac_counts) == "tag_directory_KO.H3K27Ac_R1..Tag.Count.in.given.bp..3206024.0.Total..normalization.factor...3.12..effective.total...10000000."] <- "H3K27Ac_KO_R1"
+
+colnames(MafB1_H3K27Ac_counts)[colnames(MafB1_H3K27Ac_counts) == "tag_directory_KO.H3K27Ac_R2..Tag.Count.in.given.bp..3641165.0.Total..normalization.factor...2.75..effective.total...10000000."] <- "H3K27Ac_KO_R2"
+```
+
+```{r}
+MafB1_H3K27Ac_counts$H3K27Ac_WT <- rowMeans(MafB1_H3K27Ac_counts[,c('H3K27Ac_WT_R1', 'H3K27Ac_WT_R2')])
+MafB1_H3K27Ac_counts$H3K27Ac_KO <- rowMeans(MafB1_H3K27Ac_counts[,c('H3K27Ac_KO_R1', 'H3K27Ac_KO_R2')])
+
+MafB1_H3K27Ac_counts$log2_H3K27Ac_WT <- log2(MafB1_H3K27Ac_counts$H3K27Ac_WT + 1)
+MafB1_H3K27Ac_counts$log2_H3K27Ac_KO <- log2(MafB1_H3K27Ac_counts$H3K27Ac_KO + 1)
+MafB1_H3K27Ac_counts$below_diag <- MafB1_H3K27Ac_counts$log2_H3K27Ac_KO < MafB1_H3K27Ac_counts$log2_H3K27Ac_WT
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB1_H3K27Ac_counts, aes(x = log2_H3K27Ac_WT, y = log2_H3K27Ac_KO)) +
+  geom_point(aes(color = below_diag), show.legend = FALSE) +
+  scale_color_manual(values = c("FALSE" = "red", "TRUE" = "blue")) +
+  geom_abline(slope = 1) +
+  ggtitle("H3K27ac at MafB1 Peaks") +
+  xlab("Log2(norm tags + 1) \nMafbfl/fl 1") +
+  ylab("Lyz2CreMafbfl/fl \nLog2(norm tags + 1)") +
+  xlim(0, 10) +
+  ylim(0, 10) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks.length = unit(.15, "cm"),
+    panel.border = element_rect(fill = NA, color = "black", linetype = "solid")
+  )
+```
+
+```{r}
+table(MafB1_H3K27Ac_counts$below_diag)
+```
+
+
+```{r}
+wilcox.test(MafB1_H3K27Ac_counts$log2_H3K27Ac_WT, MafB1_H3K27Ac_counts$log2_H3K27Ac_WTvsKO)
+```
+
+
+### MafB2
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks.bed mm10 -size 4000 -hist 10 -d tag_directory_WT-H3K27Ac_R1/ tag_directory_WT-H3K27Ac_R2/ tag_directory_KO-H3K27Ac_R1/ tag_directory_KO-H3K27Ac_R2/ > MafB2_H3K27Ac_hist.txt
+```
+
+```{r}
+MafB2_H3K27Ac_hist <- read.table("MafB2_H3K27Ac_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_H3K27Ac_hist)[colnames(MafB2_H3K27Ac_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB2_peaks.bed.mm10..size.4000..hist.10..d.tag_directory_WT.H3K27Ac_R1..tag_directory_WT.H3K27Ac_R2..tag_directory_KO.H3K27Ac_R1..tag_directory_KO.H3K27Ac_R2.."] <- "Distance.from.Center"
+
+MafB2_H3K27Ac_hist$H3K27Ac_WT <- rowMeans(MafB2_H3K27Ac_hist[,c('tag_directory_WT.H3K27Ac_R1..Coverage', 'tag_directory_WT.H3K27Ac_R2..Coverage')])
+
+MafB2_H3K27Ac_hist$H3K27Ac_KO <- rowMeans(MafB2_H3K27Ac_hist[,c('tag_directory_KO.H3K27Ac_R1..Coverage', 'tag_directory_KO.H3K27Ac_R2..Coverage')])
+```
+
+```{r fig.height=4, fig.width=3}
+ggplot(data = MafB2_H3K27Ac_hist, aes(x = Distance.from.Center, y = H3K27Ac_WT))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  geom_line(show.legend = FALSE, colour = "red", aes(x = Distance.from.Center, y = H3K27Ac_KO))+
+  ggtitle("H3K27ac at MafB2 peaks")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks.bed mm10 -d tag_directory_WT-H3K27Ac_R1/ tag_directory_WT-H3K27Ac_R2/ tag_directory_KO-H3K27Ac_R1/ tag_directory_KO-H3K27Ac_R2/ > MafB2_H3K27Ac_counts.txt
+```
+
+```{r}
+MafB2_H3K27Ac_counts <- read.table("MafB2_H3K27Ac_counts.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_H3K27Ac_counts)[colnames(MafB2_H3K27Ac_counts) == "PeakID..cmd.annotatePeaks.pl.MafB2_peaks.bed.mm10..d.tag_directory_WT.H3K27Ac_R1..tag_directory_WT.H3K27Ac_R2..tag_directory_KO.H3K27Ac_R1..tag_directory_KO.H3K27Ac_R2.."] <- "PeakID"
+
+colnames(MafB2_H3K27Ac_counts)[colnames(MafB2_H3K27Ac_counts) == "tag_directory_WT.H3K27Ac_R1..Tag.Count.in.given.bp..3449599.0.Total..normalization.factor...2.90..effective.total...10000000."] <- "H3K27Ac_WT_R1"
+
+colnames(MafB2_H3K27Ac_counts)[colnames(MafB2_H3K27Ac_counts) == "tag_directory_WT.H3K27Ac_R2..Tag.Count.in.given.bp..3954896.0.Total..normalization.factor...2.53..effective.total...10000000."] <- "H3K27Ac_WT_R2"
+
+colnames(MafB2_H3K27Ac_counts)[colnames(MafB2_H3K27Ac_counts) == "tag_directory_KO.H3K27Ac_R1..Tag.Count.in.given.bp..3206024.0.Total..normalization.factor...3.12..effective.total...10000000."] <- "H3K27Ac_KO_R1"
+
+colnames(MafB2_H3K27Ac_counts)[colnames(MafB2_H3K27Ac_counts) == "tag_directory_KO.H3K27Ac_R2..Tag.Count.in.given.bp..3641165.0.Total..normalization.factor...2.75..effective.total...10000000."] <- "H3K27Ac_KO_R2"
+```
+
+```{r}
+MafB2_H3K27Ac_counts$H3K27Ac_WT <- rowMeans(MafB2_H3K27Ac_counts[,c('H3K27Ac_WT_R1', 'H3K27Ac_WT_R2')])
+MafB2_H3K27Ac_counts$H3K27Ac_KO <- rowMeans(MafB2_H3K27Ac_counts[,c('H3K27Ac_KO_R1', 'H3K27Ac_KO_R2')])
+
+MafB2_H3K27Ac_counts$log2_H3K27Ac_WT <- log2(MafB2_H3K27Ac_counts$H3K27Ac_WT + 1)
+MafB2_H3K27Ac_counts$log2_H3K27Ac_KO <- log2(MafB2_H3K27Ac_counts$H3K27Ac_KO + 1)
+MafB2_H3K27Ac_counts$below_diag <- MafB2_H3K27Ac_counts$log2_H3K27Ac_KO < MafB2_H3K27Ac_counts$log2_H3K27Ac_WT
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB2_H3K27Ac_counts, aes(x = log2_H3K27Ac_WT, y = log2_H3K27Ac_KO)) +
+  geom_point(aes(color = below_diag), show.legend = FALSE) +
+  scale_color_manual(values = c("FALSE" = "red", "TRUE" = "blue")) +
+  geom_abline(slope = 1) +
+  ggtitle("H3K27ac at MafB2 Peaks") +
+  xlab("Log2(norm tags + 1) \nMafbfl/fl 1") +
+  ylab("Lyz2CreMafbfl/fl \nLog2(norm tags + 1)") +
+  xlim(0, 10) +
+  ylim(0, 10) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks.length = unit(.15, "cm"),
+    panel.border = element_rect(fill = NA, color = "black", linetype = "solid")
+  )
+```
+
+```{r}
+table(MafB2_H3K27Ac_counts$below_diag)
+```
+
+```{r}
+wilcox.test(MafB2_H3K27Ac_counts$log2_H3K27Ac_WT, MafB2_H3K27Ac_counts$log2_H3K27Ac_WTvsKO)
+```
+
+### MafB3
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB3_peaks.bed mm10 -size 4000 -hist 10 -d tag_directory_WT-H3K27Ac_R1/ tag_directory_WT-H3K27Ac_R2/ tag_directory_KO-H3K27Ac_R1/ tag_directory_KO-H3K27Ac_R2/ > MafB3_H3K27Ac_hist.txt
+```
+
+```{r}
+MafB3_H3K27Ac_hist <- read.table("MafB3_H3K27Ac_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB3_H3K27Ac_hist)[colnames(MafB3_H3K27Ac_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB3_peaks.bed.mm10..size.4000..hist.10..d.tag_directory_WT.H3K27Ac_R1..tag_directory_WT.H3K27Ac_R2..tag_directory_KO.H3K27Ac_R1..tag_directory_KO.H3K27Ac_R2.."] <- "Distance.from.Center"
+
+MafB3_H3K27Ac_hist$H3K27Ac_WT <- rowMeans(MafB3_H3K27Ac_hist[,c('tag_directory_WT.H3K27Ac_R1..Coverage', 'tag_directory_WT.H3K27Ac_R2..Coverage')])
+
+MafB3_H3K27Ac_hist$H3K27Ac_KO <- rowMeans(MafB3_H3K27Ac_hist[,c('tag_directory_KO.H3K27Ac_R1..Coverage', 'tag_directory_KO.H3K27Ac_R2..Coverage')])
+```
+
+```{r fig.height=4, fig.width=3}
+ggplot(data = MafB3_H3K27Ac_hist, aes(x = Distance.from.Center, y = H3K27Ac_WT))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  geom_line(show.legend = FALSE, colour = "red", aes(x = Distance.from.Center, y = H3K27Ac_KO))+
+  ggtitle("H3K27ac at MafB3 peaks")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB3_peaks.bed mm10 -d tag_directory_WT-H3K27Ac_R1/ tag_directory_WT-H3K27Ac_R2/ tag_directory_KO-H3K27Ac_R1/ tag_directory_KO-H3K27Ac_R2/ > MafB3_H3K27Ac_counts.txt
+```
+
+```{r}
+MafB3_H3K27Ac_counts <- read.table("MafB3_H3K27Ac_counts.txt", header = TRUE, sep = "\t")
+
+colnames(MafB3_H3K27Ac_counts)[colnames(MafB3_H3K27Ac_counts) == "PeakID..cmd.annotatePeaks.pl.MafB3_peaks.bed.mm10..d.tag_directory_WT.H3K27Ac_R1..tag_directory_WT.H3K27Ac_R2..tag_directory_KO.H3K27Ac_R1..tag_directory_KO.H3K27Ac_R2.."] <- "PeakID"
+
+colnames(MafB3_H3K27Ac_counts)[colnames(MafB3_H3K27Ac_counts) == "tag_directory_WT.H3K27Ac_R1..Tag.Count.in.given.bp..3449599.0.Total..normalization.factor...2.90..effective.total...10000000."] <- "H3K27Ac_WT_R1"
+
+colnames(MafB3_H3K27Ac_counts)[colnames(MafB3_H3K27Ac_counts) == "tag_directory_WT.H3K27Ac_R2..Tag.Count.in.given.bp..3954896.0.Total..normalization.factor...2.53..effective.total...10000000."] <- "H3K27Ac_WT_R2"
+
+colnames(MafB3_H3K27Ac_counts)[colnames(MafB3_H3K27Ac_counts) == "tag_directory_KO.H3K27Ac_R1..Tag.Count.in.given.bp..3206024.0.Total..normalization.factor...3.12..effective.total...10000000."] <- "H3K27Ac_KO_R1"
+
+colnames(MafB3_H3K27Ac_counts)[colnames(MafB3_H3K27Ac_counts) == "tag_directory_KO.H3K27Ac_R2..Tag.Count.in.given.bp..3641165.0.Total..normalization.factor...2.75..effective.total...10000000."] <- "H3K27Ac_KO_R2"
+```
+
+```{r}
+MafB3_H3K27Ac_counts$H3K27Ac_WT <- rowMeans(MafB3_H3K27Ac_counts[,c('H3K27Ac_WT_R1', 'H3K27Ac_WT_R2')])
+MafB3_H3K27Ac_counts$H3K27Ac_KO <- rowMeans(MafB3_H3K27Ac_counts[,c('H3K27Ac_KO_R1', 'H3K27Ac_KO_R2')])
+
+MafB3_H3K27Ac_counts$log2_H3K27Ac_WT <- log2(MafB3_H3K27Ac_counts$H3K27Ac_WT + 1)
+MafB3_H3K27Ac_counts$log2_H3K27Ac_KO <- log2(MafB3_H3K27Ac_counts$H3K27Ac_KO + 1)
+MafB3_H3K27Ac_counts$below_diag <- MafB3_H3K27Ac_counts$log2_H3K27Ac_KO < MafB3_H3K27Ac_counts$log2_H3K27Ac_WT
+```
+
+```{r fig.height=4.3, fig.width=4}
+ggplot(data = MafB3_H3K27Ac_counts, aes(x = log2_H3K27Ac_WT, y = log2_H3K27Ac_KO)) +
+  geom_point(aes(color = below_diag), show.legend = FALSE) +
+  scale_color_manual(values = c("FALSE" = "red", "TRUE" = "blue")) +
+  geom_abline(slope = 1) +
+  ggtitle("H3K27ac at MafB3 Peaks") +
+  xlab("Log2(norm tags + 1) \nMafbfl/fl 1") +
+  ylab("Lyz2CreMafbfl/fl \nLog2(norm tags + 1)") +
+  xlim(0, 10) +
+  ylim(0, 10) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks.length = unit(.15, "cm"),
+    panel.border = element_rect(fill = NA, color = "black", linetype = "solid")
+  )
+```
+
+```{r}
+table(MafB3_H3K27Ac_counts$below_diag)
+```
+
+```{r}
+wilcox.test(MafB3_H3K27Ac_counts$log2_H3K27Ac_WT, MafB3_H3K27Ac_counts$log2_H3K27Ac_WTvsKO)
+```
+
+## MafB target genes
+
+### MafB1
+
+```{r}
+MafB1_genes <- MafB1_peaks_annot[MafB1_peaks_annot[, 'Distance.to.TSS'] >= -2000 & MafB1_peaks_annot[, 'Distance.to.TSS'] <= 2000, ]
+
+MafB1_genes <- unique(MafB1_genes$Gene.Name)
+```
+
+```{r}
+Mac_sign <- read_excel("Mac_sign.xlsx")
+
+Mac_sign_genes <- Mac_sign$Gene_Symbol
+```
+
+```{r}
+# Helper function to display Venn diagram
+display_venn <- function(x, ...){
+  library(VennDiagram)
+  grid.newpage()
+  venn_object <- venn.diagram(x, filename = NULL, ...)
+  grid.draw(venn_object)
+}
+```
+
+```{r fig.height=4, fig.width=4}
+x <- list(MafB1_target = MafB1_genes, Mac_sign = Mac_sign_genes)
+#pdf(file = "C:/Users/domie/Documents/CUTandRUN/Venn_MafB1_Mac.pdf", width = 4, height = 4)
+display_venn(x, fill = c("red", "blue"))
+#dev.off()
+```
+
+```{r eval=FALSE}
+g <- readGFF("C:/Users/domie/Documents/CUTandRUN/genes.gtf")
+pc <- g %>% dplyr::filter(type == "gene")
+rm(g)
+dim(pc)
+# genes 22597
+```
+
+```{r}
+dat <-
+matrix(c(297, 3251, 629, 18420),
+       nrow = 2,
+     dimnames = list(Mac_sign = c("YES", "NO"),
+                       MafB1_target = c("YES", "NO")))
+dat
+fisher.test(dat)
+```
+
+### MafB2
+
+```{r}
+MafB2_genes <- MafB2_peaks_annot[MafB2_peaks_annot[, 'Distance.to.TSS'] >= -2000 & MafB2_peaks_annot[, 'Distance.to.TSS'] <= 2000, ]
+
+MafB2_genes <- unique(MafB2_genes$Gene.Name)
+MafB2_genes <- na.omit(MafB2_genes)
+```
+
+```{r fig.height=4, fig.width=4}
+x <- list(MafB2_target = MafB2_genes, Mac_sign = Mac_sign_genes)
+#pdf(file = "C:/Users/domie/Documents/CUTandRUN/Venn_MafB2_Mac.pdf", width = 4, height = 4)
+display_venn(x, fill = c("red", "blue"))
+#dev.off()
+```
+
+```{r}
+dat <-
+matrix(c(303, 3208, 623, 18463),
+       nrow = 2,
+     dimnames = list(Mac_sign = c("YES", "NO"),
+                       MafB2_target = c("YES", "NO")))
+dat
+fisher.test(dat)
+```
+
+### MafB3
+
+```{r}
+MafB3_genes <- MafB3_peaks_annot[MafB3_peaks_annot[, 'Distance.to.TSS'] >= -2000 & MafB3_peaks_annot[, 'Distance.to.TSS'] <= 2000, ]
+
+MafB3_genes <- unique(MafB3_genes$Gene.Name)
+```
+
+```{r fig.height=4, fig.width=4}
+x <- list(MafB3_target = MafB3_genes, Mac_sign = Mac_sign_genes)
+#pdf(file = "C:/Users/domie/Documents/CUTandRUN/Venn_MafB3_Mac.pdf", width = 4, height = 4)
+display_venn(x, fill = c("red", "blue"))
+#dev.off()
+```
+
+```{r}
+dat <-
+matrix(c(145, 1125, 781, 20546),
+       nrow = 2,
+     dimnames = list(Mac_sign = c("YES", "NO"),
+                       MafB1_target = c("YES", "NO")))
+dat
+fisher.test(dat)
+```
+
+
+
+
