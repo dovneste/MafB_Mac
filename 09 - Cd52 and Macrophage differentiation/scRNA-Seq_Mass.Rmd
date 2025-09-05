@@ -1,0 +1,412 @@
+---
+title: "Cd52 and Macrophage differentiation"
+author: "Domien Vanneste"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  header-includes: "-| ```{=latex} \\usepackage{fvextra} \\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+    breaksymbolleft={}, showspaces = false, showtabs = false, breaklines, commandchars=\\\\\\{\\}
+    } ```"
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+\newpage
+
+# Introduction
+To generate a single-cell transcriptomic map of macrophage differentiation, we selected clusters  of mac and mac progenitors from recently published scRNA-seq data of FACS-sorted CD11blow/+ fetal liver cells at embryonic day of development E14.5 (Kayvanjoo et al., 2014), based on the expression EMP, preMac and Mac signature genes (Mass et al., 2016). Cells were reclustered using the FindClusters function from the Seurat package (4.3.0). To evaluate trajectory-based pseudotime analysis, we used the Slingshot package (2.14.0) with EPM as starting cluster and mac as ending cluster. Using Slingshot pseudotime, we identified Cd52 as highly expressed in pre-mac but downregulated at the pre-mac to mac transition, coinciding with increased Mafb expression. Interestingly, Cd52 was higher expressed in most Mafb-deficient RTMs as compared to their WT counterparts, with the exception of Ly6C+ CMs.
+
+
+# Load packages
+
+```{r}
+suppressMessages({
+library(SeuratObject)
+library(Seurat)
+library(dplyr)
+library(readxl)
+library(slingshot)
+library(DelayedMatrixStats)
+library(ggplot2)
+})
+```
+
+# Download data Kayvanjoo et al 2024 (Elvira Mass Lab) from GEO (GSE225443)
+
+Amir Hossein KayvanjooIva SplichalovaDavid Alejandro BejaranoHao HuangKatharina MauelNikola MakdissiDavid HeiderHui Ming TewNora Reka BalzerEric GretoCollins Osei-SarpongKevin BaßlerJoachim L SchultzeStefan UderhardtEva KiermaierMarc BeyerAndreas SchlitzerElvira Mass (2024) Fetal liver macrophages contribute to the hematopoietic stem cell niche by controlling granulopoiesis eLife 13:e86493.
+https://doi.org/10.7554/eLife.86493
+
+```{bash, eval = FALSE}
+https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE225443
+```
+
+
+# Load data and construct Seurat Object
+
+```{r}
+# Use the correct file path format for Windows
+dirs <- list.dirs(path = "C:/Users/domie/Documents/scRNA-Seq_Mass_2016/Mass_2023", 
+                  full.names = FALSE, recursive = FALSE)
+
+list_sample <- list()
+
+for (directory in dirs) {
+    # Construct a platform-independent path
+    data_path <- file.path("C:/Users/domie/Documents/scRNA-Seq_Mass_2016/Mass_2023", directory, "filtered_feature_bc_matrix")
+    
+    # Read the 10x data
+    mass.data <- Read10X(data.dir = data_path, gene.column = 1) 
+    
+    # Create Seurat object
+    mass_group <- CreateSeuratObject(
+        counts = mass.data, 
+        project = substr(directory, 1, nchar(directory) - 27), 
+        min.cells = 3, 
+        min.features = 200
+    )
+    
+    # Append to list
+    list_sample <- append(list_sample, mass_group)
+}
+
+# Merge all Seurat objects
+mass_cells <- merge(list_sample[[1]], y = list_sample[-1], add.cell.ids = as.character(seq_along(list_sample)), project = "mass_cells")
+```
+
+# Standard pre-processing workflow
+
+## QC and selecting cells for further analysis
+
+```{r}
+mass_cells[["percent.mt"]] <- PercentageFeatureSet(mass_cells, pattern = "^mt-")
+
+VlnPlot(mass_cells, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+```
+
+```{r}
+plot1 <- FeatureScatter(mass_cells, feature1 = "nCount_RNA", feature2 = "percent.mt")
+plot2 <- FeatureScatter(mass_cells, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+plot1 + plot2
+```
+
+```{r}
+mass_cells <- subset(mass_cells, subset = nFeature_RNA > 200 & nFeature_RNA < 3500 & percent.mt < 15)
+```
+
+## Normalizing the data
+
+```{r}
+mass_cells <- NormalizeData(mass_cells)
+```
+
+## Identification of highly variable features
+
+```{r}
+mass_cells <- FindVariableFeatures(mass_cells, selection.method = "vst", nfeatures = 2000)
+
+# plot variable features without labels
+VariableFeaturePlot(mass_cells)
+```
+
+## Scaling the data
+
+```{r}
+all.genes <- rownames(mass_cells)
+mass_cells <- ScaleData(mass_cells, features = all.genes)
+```
+
+# Perform linear dimensional reduction
+
+```{r}
+mass_cells <- RunPCA(mass_cells, features = VariableFeatures(object = mass_cells))
+DimPlot(mass_cells, reduction = "pca") + NoLegend()
+```
+
+## Determine the ‘dimensionality’ of the dataset
+
+```{r}
+ElbowPlot(mass_cells, ndims = 50)
+```
+
+# Cluster the cells
+
+```{r}
+mass_cells <- FindNeighbors(mass_cells, dims = 1:20)
+mass_cells <- FindClusters(mass_cells, resolution = 1.2)
+```
+
+# Run non-linear dimensional reduction (UMAP)
+
+```{r}
+mass_cells <- RunUMAP(mass_cells, dims = 1:20)
+DimPlot(mass_cells, reduction = "umap", label = T) + NoLegend()
+```
+
+```{r}
+FeaturePlot(mass_cells, features = "Mafb")
+```
+
+# Score for EMP, pMac, Mac and liverMac signatures (Mass et al 2016) 
+
+```{r}
+signatures <- read_excel("signatures.xlsx")
+
+EMP_sign <- list(na.omit(signatures$EMP_sign))
+
+pMac_sign <- list(na.omit(signatures$pMac_sign))
+
+Mac_sign <- list(na.omit(signatures$Mac_sign))
+
+liverMac_sign <- list(na.omit(signatures$liverMac_sign))
+
+mass_cells <- AddModuleScore(mass_cells, features = EMP_sign, name = 'EMP_sign')
+mass_cells <- AddModuleScore(mass_cells, features = pMac_sign, name = 'pMac_sign')
+mass_cells <- AddModuleScore(mass_cells, features = Mac_sign, name = 'Mac_sign')
+mass_cells <- AddModuleScore(mass_cells, features = liverMac_sign, name = 'liverMac_sign')
+```
+
+```{r}
+FeaturePlot(mass_cells, features = "EMP_sign1", min.cutoff = 'q10', max.cutoff = 'q90')
+FeaturePlot(mass_cells, features = "pMac_sign1", min.cutoff = 'q10', max.cutoff = 'q90')
+FeaturePlot(mass_cells, features = "Mac_sign1", min.cutoff = 'q10', max.cutoff = 'q90')
+FeaturePlot(mass_cells, features = "liverMac_sign1", min.cutoff = 'q10', max.cutoff = 'q90')
+```
+
+```{r}
+VlnPlot(mass_cells, features = "EMP_sign1", pt.size = 0) + NoLegend()
+VlnPlot(mass_cells, features = "pMac_sign1", pt.size = 0) + NoLegend()
+VlnPlot(mass_cells, features = "Mac_sign1", pt.size = 0) + NoLegend()
+VlnPlot(mass_cells, features = "liverMac_sign1", pt.size = 0) + NoLegend()
+```
+
+```{r, eval=FALSE}
+saveRDS(mass_cells, file = "mass_cells.rds")
+```
+
+
+
+# Subset EMP, pMac and Mac
+
+```{r}
+mac_diff <- subset(mass_cells, idents = c(1, 2, 3, 4, 5, 11))
+DimPlot(mac_diff, label = T)
+```
+
+```{r}
+rm(mass_cells)
+```
+
+# Reprocess data
+
+```{r}
+mac_diff <- FindVariableFeatures(mac_diff, selection.method = "vst", nfeatures = 2000)
+all.genes <- rownames(mac_diff)
+mac_diff <- ScaleData(mac_diff, features = all.genes)
+mac_diff <- RunPCA(mac_diff, features = VariableFeatures(object = mac_diff))
+ElbowPlot(mac_diff, ndims = 50)
+```
+
+# Recluster data
+
+```{r fig.height=2.5, fig.width=3.8}
+mac_diff <- FindNeighbors(mac_diff, dims = 1:6)
+mac_diff <- FindClusters(mac_diff, resolution = 0.08)
+mac_diff <- RunUMAP(mac_diff, dims = 1:6)
+DimPlot(mac_diff, label = T, raster = T) + ggtitle("")
+```
+
+# Assigning cell type identity to clusters
+
+```{r fig.height=2.5, fig.width=3.8}
+FeaturePlot(mac_diff, features = "EMP_sign1", min.cutoff = 'q10', max.cutoff = 'q90')
+FeaturePlot(mac_diff, features = "pMac_sign1", min.cutoff = 'q10', max.cutoff = 'q90')
+FeaturePlot(mac_diff, features = "Mac_sign1", min.cutoff = 'q10', max.cutoff = 'q90')
+FeaturePlot(mac_diff, features = "liverMac_sign1", min.cutoff = 'q10', max.cutoff = 'q90')
+```
+
+```{r fig.height=2.5, fig.width=2.5}
+VlnPlot(mac_diff, features = "EMP_sign1", pt.size = 0) + NoLegend()
+VlnPlot(mac_diff, features = "pMac_sign1", pt.size = 0) + NoLegend()
+VlnPlot(mac_diff, features = "Mac_sign1", pt.size = 0) + NoLegend()
+VlnPlot(mac_diff, features = "liverMac_sign1", pt.size = 0) + NoLegend()
+```
+
+```{r fig.height=2.5, fig.width=4}
+mac_diff$cell_type <- factor(Idents(mac_diff), labels = c("pMac", "EMP", "Mac")) 
+
+mac_diff$cell_type <- factor(mac_diff$cell_type, levels = c("pMac", "EMP", "Mac"))
+
+Idents(mac_diff) <- "cell_type"
+
+DimPlot(mac_diff, label = T) +ggtitle("")
+```
+
+
+```{r fig.height=2.5, fig.width=4}
+mac_diff$cell_type <- factor(mac_diff$cell_type, levels = c("EMP", "pMac", "Mac"))
+
+Idents(mac_diff) <- "cell_type"
+
+DimPlot(mac_diff)+ggtitle("")
+```
+
+
+```{r fig.height=2.5, fig.width=4}
+pal <- c("#ff7f00", "#1f78b4", "#33a02c")
+DimPlot(mac_diff, cols = pal)+ggtitle("")
+```
+
+```{r, eval = FALSE}
+ggsave(filename = "UMAP_mac_diff.pdf", width = 4, height = 2.5)
+```
+
+# Finding differentially expressed features
+
+```{r}
+markers <- FindAllMarkers(mac_diff, only.pos = T)
+```
+
+
+```{r fig.height=2.5, fig.width=3.8}
+FeaturePlot(mac_diff, features = "Cd52", min.cutoff = 'q10', max.cutoff = 'q90')
+```
+
+```{r fig.height=2.5, fig.width=3.8}
+FeaturePlot(mac_diff, features = "Mafb", min.cutoff = 'q10', max.cutoff = 'q90')
+```
+
+# Perform Slingshot pseudotime analysis
+
+```{r}
+# Save the objects as separate matrices for input in slingshot
+dimred <- mac_diff@reductions$umap@cell.embeddings
+clustering <- mac_diff$cell_type
+counts <- as.matrix(mac_diff@assays$RNA@counts[mac_diff@assays$RNA@var.features, ])
+```
+
+```{r}
+#Run default Slingshot
+set.seed(1)
+lineages <- getLineages(data = dimred, clusterLabels = clustering, end.clus = c("Mac"), start.clus = "EMP")
+
+lineages
+```
+
+
+```{r}
+# Define curves
+curves <- as.SlingshotDataSet(getCurves(
+  data          = lineages,
+  thresh        = 1e-1,
+  stretch       = 1e-1,
+  allow.breaks  = F,
+  approx_points = 1000
+))
+
+curves
+```
+
+```{r}
+pal <- c("#ff7f00", "#1f78b4", "#33a02c")
+{
+  plot(mac_diff@reductions$umap@cell.embeddings, col = pal[clustering], pch = 16)
+  lines(curves, lwd = 2, col = "black")
+ 
+}
+```
+
+
+```{r}
+pseudotime <- slingPseudotime(curves, na = FALSE)
+
+mac_diff$pseudotime <- pseudotime
+```
+
+```{r fig.height=2.5, fig.width=3.8}
+
+FeaturePlot(mac_diff, features = "pseudotime")+ viridis::scale_color_viridis()+ ggtitle("")
+  
+```
+
+```{r, eval = FALSE}
+ggsave(filename = "UMAP_mac_diff_pseudotime.pdf", width = 3.8, height = 2.5)
+```
+
+```{r}
+VlnPlot(mac_diff, features = "pseudotime", cols = pal)+ geom_hline(yintercept=7.5) + geom_hline(yintercept=18)
+```
+
+```{r}
+graph <- FetchData(mac_diff, vars = "pseudotime") 
+graph <- cbind(graph, FetchData(mac_diff, vars = "Cd52"))
+graph <- cbind(graph, FetchData(mac_diff, vars = "Mafb"))
+graph <- cbind(graph, FetchData(mac_diff, vars = "Kit"))
+```
+
+
+```{r fig.height=1.5, fig.width=4}
+ggplot(graph, aes(x = pseudotime, y = Cd52))+
+  geom_smooth(color = "#1f78b4", se = F)+
+  geom_vline(xintercept = 7.5)+
+  geom_vline(xintercept = 18)+
+  xlab("Pseudotime")+
+  ylab("Expression")+
+  scale_x_continuous(expand = c(0, 0))+
+  theme_classic()
+```
+
+```{r, eval=FALSE}
+ggsave(filename = "Cd52_along_pseudotime.pdf", width = 4, height = 1.75)
+```
+
+```{r fig.height=1.5, fig.width=4}
+ggplot(graph, aes(x = pseudotime, y = Mafb))+
+  geom_smooth(color = "#33a02c", se = F)+
+  geom_vline(xintercept = 7.5)+
+  geom_vline(xintercept = 18)+
+  xlab("Pseudotime")+
+  ylab("Expression")+
+  scale_x_continuous(expand = c(0, 0))+
+  theme_classic()
+```
+
+```{r, eval=FALSE}
+ggsave(filename = "Mafb_along_pseudotime.pdf", width = 4, height = 1.75)
+```
+
+```{r, eval = FALSE}
+saveRDS(mac_diff, file = "mac_diff.rds")
+```
+
+# Cd52 expression WT vs KO
+
+```{r}
+sc <- readRDS("sc.rds")
+
+pal <-c("#6A3D9A", "#CAB2D6", "#E31A1C", "#FB9A99", "#33A02C", "#B2DF8A", "#1F78B4", "#A6CEE3", "#FF7F00", "#FDBF6F", "#FF00FA", "#FFA1FD", "#87421F", "#CDAA7D")
+
+DimPlot(sc, cols = pal)
+```
+
+
+```{r fig.height=4, fig.width=7}
+VlnPlot(sc, features = "Cd52", cols = pal, pt.size = 0)+NoLegend()+ggtitle("")
+```
+
+```{r, eval=FALSE}
+ggsave(filename = "VlnPlot_Cd52.pdf", width = 7, height = 4)
+```
+
+```{r}
+sessionInfo()
+```
+
+
