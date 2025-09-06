@@ -1,0 +1,399 @@
+---
+title: "CUT&RUN MDM - Figures"
+author: "Domien Vanneste"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  header-includes: "-| ```{=latex} \\usepackage{fvextra} \\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+    breaksymbolleft={}, showspaces = false, showtabs = false, breaklines, commandchars=\\\\\\{\\}
+    } ```"
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+\newpage
+
+# Introduction
+To assess whether MafB also regulates macrophage identity in humans, we performed CUT&RUN for MafB on human monocyte-derived mac (MDMs). CUT&RUN was performed with a CUTANA ChIC/CUT&RUN Kit (EpiCypher, 141048) according to manufacturer’s instructions, with modifications. BMDMs from Mafbfl/fl or Lyz2CreMafbfl/fl mice were washed with ice-cold PBS and fixed with 0.1 % formaldehyde in PBS for 2 min at room temperature. Fixation was quenched by adding glycine (Merck, 104691000) to 0.125 M.  For each CUT&RUN sample, 1 x 10^6 fixed cells and 0.5 µg antibodies were added:
+
+IgG (EpiCypher, 13-0042)
+MafB2 (Cell Signaling Technology, 41019)
+
+CUT&RUN libraries were prepared with a CUTANA™ CUT&RUN Library Prep Kit (EpiCypher, 141001) according to manufacturer’s instructions. These libraries were sequenced on an NovaSeq 6000 (Illumina) sequencer on an S4 flow cell at 10 million reads per sample.
+\newpage
+
+# Load Packages
+
+```{r}
+suppressMessages({
+library(ggplot2)
+library(colorRamp2)
+library(ComplexHeatmap)
+library(readxl)
+library(futile.logger)
+library(grid)
+library(rtracklayer)
+library(dplyr)
+library(VennDiagram)
+})
+```
+
+# Figure S7
+
+```{r}
+MafB2_peaks_rep1 <- read.table("MafB2_R1.seacr.peaks.stringent.bed", header = FALSE, sep = "\t")
+
+MafB2_peaks_rep2 <- read.table("MafB2_R2.seacr.peaks.stringent.bed", header = FALSE, sep = "\t")
+
+MafB2_peaks_consensus <- read.table("MafB2.seacr.peaks.consensus.bed", header = FALSE, sep = "\t")
+```
+
+```{r}
+#peaks rep1
+nrow(MafB2_peaks_rep1)
+
+#peaks rep2
+nrow(MafB2_peaks_rep2)
+
+#shared peaks
+nrow(MafB2_peaks_consensus)
+```
+
+## Rep. 1
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_R1.seacr.peaks.stringent.bed mm10 -size 4000 -hist 10 -d MafB2_R1/ > MafB2_R1_hist.txt
+```
+
+```{r}
+MafB2_R1_hist <- read.table("MafB2_R1_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_R1_hist)[colnames(MafB2_R1_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB2_R1.seacr.peaks.stringent.bed.mm10..size.4000..hist.10..d.MafB2_R1.."] <- "Distance.from.Center"
+```
+
+n peaks : 26327
+FDR =  0.000449484821243296
+
+```{r fig.height=3, fig.width=3}
+ggplot(data = MafB2_R1_hist, aes(x = Distance.from.Center, y = MafB2_R1..Coverage))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  ggtitle("Rep. 1: 26327 peaks \nFDR = 0.000449485")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r}
+ggsave("Figure_S7G_Rep1.pdf", width = 3, height = 3)
+```
+
+## Rep 2
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_R2.seacr.peaks.stringent.bed mm10 -size 4000 -hist 10 -d MafB2_R2/ > MafB2_R2_hist.txt
+```
+
+```{r}
+MafB2_R2_hist <- read.table("MafB2_R2_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_R2_hist)[colnames(MafB2_R2_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB2_R2.seacr.peaks.stringent.bed.mm10..size.4000..hist.10..d.MafB2_R2.."] <- "Distance.from.Center"
+```
+
+n peaks : 30718
+FDR =  0.00038610038610043
+
+```{r fig.height=3, fig.width=3}
+ggplot(data = MafB2_R2_hist, aes(x = Distance.from.Center, y = MafB2_R2..Coverage))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  ggtitle("Rep. 2: 30718 peaks \nFDR = 0.000386100")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r}
+ggsave("Figure_S7G_Rep2.pdf", width = 3, height = 3)
+```
+
+# Figure S7H
+
+```{bash eval = FALSE}
+samtools view -c -F 4 MafB2_R1.target.markdup.sorted.bam
+bedtools intersect -a MafB2_R1.target.markdup.sorted.bam -b MafB2_R1.seacr.peaks.stringent.bed -bed | wc -l
+
+samtools view -c -F 4 MafB2_R2.target.markdup.sorted.bam
+bedtools intersect -a MafB2_R2.target.markdup.sorted.bam -b MafB2_R2.seacr.peaks.stringent.bed -bed | wc -l
+```
+
+# Figure S7I
+
+```{r}
+MafB2_counts <- read.table("MafB2_counts.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "PeakID..cmd.annotatePeaks.pl.MafB2_peaks_merged.bed.mm10..d.IgG_R1..MafB2_R1..MafB2_R2.."] <- "PeakID"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "IgG_R1..Tag.Count.in.given.bp..4149983.0.Total..normalization.factor...2.41..effective.total...10000000."] <- "IgG_R1"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_R1..Tag.Count.in.given.bp..7202841.0.Total..normalization.factor...1.39..effective.total...10000000."] <- "MafB2_R1"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_R2..Tag.Count.in.given.bp..8260258.0.Total..normalization.factor...1.21..effective.total...10000000."] <- "MafB2_R2"
+```
+
+```{r fig.height=3.225, fig.width=3}
+ggplot(data = MafB2_counts, aes(x =log2(MafB2_R1+1), y =log2(MafB2_R2+1)))+
+  geom_point(show.legend = FALSE, colour = "blue")+
+  geom_abline(slope = 1)+
+  ggtitle("24755 merged peaks")+
+  xlab("Log2(norm tags + 1) \nRep. 1")+
+  ylab("Rep. 2 \nLog2(norm tags + 1)")+
+  xlim(0,12)+
+  ylim(0,12)+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r}
+ggsave("Figure_S7I.pdf", width = 3, height = 3.225)
+```
+
+# Figure 7A
+
+## Histogram
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks_merged.bed mm10 -size 4000 -hist 10 -d IgG_R1/ MafB2_R1/ MafB2_R2/ > MafB2_hist.txt
+```
+
+```{r}
+MafB2_hist <- read.table("MafB2_hist.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_hist)[colnames(MafB2_hist) == "Distance.from.Center..cmd.annotatePeaks.pl.MafB2_peaks_merged.bed.mm10..size.4000..hist.10..d.IgG_R1..MafB2_R1..MafB2_R2.."] <- "Distance.from.Center"
+
+MafB2_hist$MafB2 <- rowMeans(MafB2_hist[,c('MafB2_R1..Coverage', 'MafB2_R2..Coverage')])
+```
+
+```{r fig.height=4, fig.width=3}
+ggplot(data = MafB2_hist, aes(x = Distance.from.Center, y = MafB2))+
+  geom_line(show.legend = FALSE, colour = "blue")+
+  geom_line(show.legend = FALSE, colour = "grey", aes(x = Distance.from.Center, y = IgG_R1..Coverage))+
+  ggtitle("MafB CUT&RUN in MDM")+
+  xlab("Distance from peak center (bp)")+
+  ylab("Normalized tags")+
+  theme_classic()+
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), axis.ticks.length=unit(.15, "cm"), panel.border = element_rect(fill=NA,color="black", linetype="solid"))
+```
+
+```{r}
+ggsave("Figure_7A_MDM_Hist.pdf", width = 3, height = 4)
+```
+
+## Heatmap
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks_merged.bed mm10 -size 4000 -hist 25 -ghist -d IgG_R1/ MafB2_R1/ MafB2_R2/ > MafB2_heatmap.txt
+```
+
+
+```{r}
+MafB2_heatmap <- read.table("MafB2_heatmap.txt", header = TRUE, check.names = FALSE, sep = "\t")
+
+IgG_R1_heatmap <- MafB2_heatmap[, 2:162]
+
+MafB2_R1_heatmap <- MafB2_heatmap[, 163:323]
+MafB2_R2_heatmap <- MafB2_heatmap[, 324:484]
+MafB2_heatmap <- (MafB2_R1_heatmap+MafB2_R2_heatmap)/2
+```
+
+### IgG
+
+```{r fig.height=4, fig.width=2}
+col_fun = colorRamp2(c(0, 20), c( "white", "red"))
+
+pdf("Figure_7A_heatmap_IgG.pdf", width = 2, height = 4)
+Heatmap(IgG_R1_heatmap, col_fun, cluster_columns = F, cluster_rows = F, heatmap_legend_param = list(title = "Tags"), use_raster = TRUE, raster_quality = 10, , column_title = "IgG")
+dev.off()
+```
+
+### MafB
+
+```{r fig.height=4, fig.width=2}
+col_fun = colorRamp2(c(0, 20), c( "white", "red"))
+
+pdf("Figure_7A_heatmap_MafB.pdf", width = 2, height = 4)
+Heatmap(MafB2_heatmap, col_fun, cluster_columns = F, cluster_rows = F, heatmap_legend_param = list(title = "Tags"), use_raster = TRUE, raster_quality = 10, column_title = "MafB2")
+dev.off()
+```
+
+# Figure 7B
+
+```{r}
+MafB2_counts$MafB2 <- rowMeans(MafB2_counts[,c('MafB2_R1', 'MafB2_R2')])
+
+MafB2_counts$log2_IgG <- log2(MafB2_counts$IgG_R1 + 1)
+MafB2_counts$log2_MafB2 <- log2(MafB2_counts$MafB2 + 1)
+MafB2_counts$below_diag <- MafB2_counts$log2_IgG < MafB2_counts$log2_MafB2
+```
+
+```{r fig.height=3.225, fig.width=3}
+ggplot(data = MafB2_counts, aes(x = log2_MafB2, y = log2_IgG)) +
+  geom_point(aes(color = below_diag), show.legend = FALSE) +
+  scale_color_manual(values = c("FALSE" = "grey", "TRUE" = "blue")) +
+  geom_abline(slope = 1) +
+  ggtitle("24755 peaks") +
+  xlab("Log2(norm tags + 1) \nMafB") +
+  ylab("IgG \nLog2(norm tags + 1)") +
+  xlim(0, 12) +
+  ylim(0, 12) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks.length = unit(.15, "cm"),
+    panel.border = element_rect(fill = NA, color = "black", linetype = "solid")
+  )
+```
+
+```{r}
+ggsave("Figure_7B.pdf", width = 3, height = 3.225)
+```
+
+```{r}
+MafB2_counts <- read.table("MafB2_counts.txt", header = TRUE, sep = "\t")
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "PeakID..cmd.annotatePeaks.pl.MafB2_peaks_merged.bed.mm10..d.IgG_R1..MafB2_R1..MafB2_R2.."] <- "PeakID"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "IgG_R1..Tag.Count.in.given.bp..4149983.0.Total..normalization.factor...2.41..effective.total...10000000."] <- "IgG_R1"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_R1..Tag.Count.in.given.bp..7202841.0.Total..normalization.factor...1.39..effective.total...10000000."] <- "MafB2_R1"
+
+colnames(MafB2_counts)[colnames(MafB2_counts) == "MafB2_R2..Tag.Count.in.given.bp..8260258.0.Total..normalization.factor...1.21..effective.total...10000000."] <- "MafB2_R2"
+
+MafB2_counts$MafB2 <- rowMeans(MafB2_counts[,c('MafB2_R1', 'MafB2_R2')])
+
+MafB2_counts$log2_IgG <- log2(MafB2_counts$IgG_R1 + 1)
+MafB2_counts$log2_MafB2 <- log2(MafB2_counts$MafB2 + 1)
+MafB2_counts$below_diag <- MafB2_counts$log2_IgG < MafB2_counts$log2_MafB2
+```
+
+```{r}
+MafB2_peaks_merged <- read.table("MafB2_peaks_merged.bed", header = F, sep = "\t")
+MafB2_PeakID <- c(MafB2_counts[MafB2_counts[,'below_diag'] == "TRUE", ]$PeakID)
+MafB2_peaks <- MafB2_peaks_merged[MafB2_peaks_merged[, 4] %in% MafB2_PeakID, ]
+
+write.table(MafB2_peaks, "MafB2_peaks.bed", sep="\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+# Figure 7C
+
+```{bash eval = FALSE}
+annotatePeaks.pl MafB2_peaks.bed genome.fa -gtf genes.gtf > MafB2_peaks_annot.txt
+```
+
+```{r}
+MafB2_peaks_annot <- read.table("MafB2_peaks_annot.txt", header = TRUE, sep = "\t")
+```
+
+```{r}
+MafB2_peaks_annot$Annotation.not.detailed <- sub(" .*", "", MafB2_peaks_annot$Annotation)
+
+table(MafB2_peaks_annot$Annotation.not.detailed)
+```
+
+# Figure 7D
+
+```{r}
+MafB2_BMDM_peaks <- read.table("MafB2_BMDM_peaks.bed", header = FALSE, sep = "\t")
+
+MafB2_BMDM_peaks$V1 <- paste0("chr", MafB2_BMDM_peaks$V1)
+
+MafB2_BMDM_peaks <- MafB2_BMDM_peaks[,1:4]
+
+write.table(MafB2_BMDM_peaks, "MafB2_BMDM_peaks_for_liftover.bed", sep="\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+Convert mouse MafB2 BMDM peaks to human 
+
+```{r}
+MafB2_BMDM_peaks_human <- read.table("MafB2_BMDM_peaks_human.bed", header = FALSE, sep = "\t")
+
+MafB2_BMDM_peaks_human$V1 <- sub("^chr", "", MafB2_BMDM_peaks_human$V1)
+
+write.table(MafB2_BMDM_peaks_human, "MafB2_BMDM_peaks_human.bed", sep="\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+check overlap
+
+```{bash eval = FALSE}
+bedtools window -a MafB2_peaks.bed -b MafB2_BMDM_peaks_human.bed -w 100 > MafB2_peaks_conserved.bed
+```
+
+```{r}
+MafB2_peaks_conserved <- read.table("MafB2_peaks_conserved.bed", header = FALSE, sep = "\t")
+
+nrow(MafB2_peaks)
+
+nrow(MafB2_BMDM_peaks_human)
+
+nrow(MafB2_peaks_conserved)
+```
+
+```{r fig.height=4, fig.width=4}
+#pdf(file = "Figure_7D_Venn.pdf", width = 4, height = 4)
+draw.pairwise.venn(area1 = 6756, area2 = 24755, cross.area = 4157, category = c("BMDM", "MDM"), fill = c("red", "purple"))
+#grid.newpage()
+```
+
+# Figure 7E
+
+```{r}
+# Helper function to display Venn diagram
+display_venn <- function(x, ...){
+  grid.newpage()
+  venn_object <- venn.diagram(x, filename = NULL, ...)
+  grid.draw(venn_object)
+}
+```
+
+```{r}
+MafB2_genes <- MafB2_peaks_annot[MafB2_peaks_annot[, 'Distance.to.TSS'] >= -2000 & MafB2_peaks_annot[, 'Distance.to.TSS'] <= 2000, ]
+
+MafB2_genes <- unique(MafB2_genes$Gene.Name)
+MafB2_genes <- na.omit(MafB2_genes)
+```
+
+```{r}
+MafB2_BMDM_peaks_annot <- read.table("MafB2_BMDM_peaks_annot.txt", header = TRUE, sep = "\t")
+
+MafB2_BMDM_genes <- MafB2_BMDM_peaks_annot[MafB2_BMDM_peaks_annot[, 'Distance.to.TSS'] >= -2000 & MafB2_BMDM_peaks_annot[, 'Distance.to.TSS'] <= 2000, ]
+
+MafB2_BMDM_genes <- unique(MafB2_BMDM_genes$Gene.Name)
+MafB2_BMDM_genes <- na.omit(MafB2_BMDM_genes)
+
+write.table(MafB2_BMDM_genes, "MafB2_BMDM_genes.txt", sep="\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+```{r}
+MafB2_BMDM_genes_human <- read.csv("MafB2_BMDM_genes_human.csv")
+
+MafB2_BMDM_genes_human <- na.omit(unique(MafB2_BMDM_genes_human$ortholog_name))
+```
+
+```{r fig.height=4, fig.width=4}
+x <- list(MDM = MafB2_genes, BMDM = MafB2_BMDM_genes_human)
+#pdf(file = "Figure_7E_Venn.pdf", width = 4, height = 4)
+display_venn(x, fill = c("purple", "red"))
+#dev.off()
+```
+
+
+
