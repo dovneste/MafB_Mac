@@ -1,0 +1,223 @@
+---
+title: "Xenopus Cell Landscape - MafB"
+author: "Domien"
+date: "`r format (Sys.time(), format='%Y-%m-%d %H:%M:%S %z')`"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  header-includes: "-| ```{=latex} \\usepackage{fvextra} \\DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+    breaksymbolleft={}, showspaces = false, showtabs = false, breaklines, commandchars=\\\\\\{\\}
+    } ```"
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+\newpage
+
+# Introduction
+
+To investigate the conservedness of MafB to imprint Mac identity across species we quantified the correlation between Mafb expression and the expression of macrophage sigature genes and MafB target genes in single cell atlases of mouse (Tabula Muris Senis), human (Tabula Sapiens), lemur (Tabula Microcebus), pig (Pig Cell Atlas), African clawed frog (Xenopus Cell Landscape) and zebrafish (Zebrafish Cell Landscape, ZCL).
+
+# Load packages
+
+```{r}
+suppressMessages({
+library(SeuratObject)
+library(Seurat)
+library(reticulate)
+library(sceasy)
+library(ggplot2)
+library(ggrastr)
+library(readr)
+library(readxl)
+})
+```
+
+# Download meta.data, counts and cellInfo from Figshare
+```{bash, eval = FALSE}
+Extract meta.data from scanpy object:
+https://figshare.com/articles/dataset/Cell_Atlas_of_the_Xenopus_Laevis_at_Single-Cell_Resolution/19152839?file=34026707
+
+Donload counts from: 
+https://figshare.com/articles/dataset/Cell_Atlas_of_the_Xenopus_Laevis_at_Single-Cell_Resolution/19152839?file=34026647
+
+cellInfo:
+https://figshare.com/articles/dataset/Cell_Atlas_of_the_Xenopus_Laevis_at_Single-Cell_Resolution/19152839?file=34026710
+```
+
+# Recontruct Seurat Object
+```{r, eval = FALSE}
+XCA <- CreateSeuratObject(counts = counts, assay = "RNA", min.cells = 3, meta.data = meta.data)
+
+cellInfo$...1 <- NULL
+
+rownames(cellInfo) <- cellInfo$cellID
+
+mat <- cellInfo[,c(1,2)]
+rownames(mat) <- rownames(cellInfo)
+
+colnames(mat) <- c("tsne_1", "tsne_2")
+
+mat <- as.matrix(mat)
+
+XCA[['tsne']] <- CreateDimReducObject(embeddings = mat, key = 'tsne_', assay = "RNA")
+
+XCA <- NormalizeData(XCA)
+
+saveRDS(XCA, file = "XCA.rds")
+```
+
+
+# Load Xenopus Cell Landscape Seurat object
+```{r}
+XCA <- readRDS("/media/uliege/T7/SingleCellAtlas/XCA.rds")
+```
+
+# Visualize clusters
+
+```{r fig.height=4, fig.width=4}
+p1 <- DimPlot(XCA, group.by = "leiden", raster = F)+theme(legend.position='none')+ggtitle("Xenopus Cell Landscape")
+
+rasterize(p1, layers='Point', dpi=1200)
+```
+
+# Calculate correlation between mafb expression and Mac signature score
+Note: Xenupus laevis has two MafB paralogs: mafb.S and mafb.L
+```{r fig.height=4, fig.width=4.5}
+FeaturePlot(XCA, features = "mafb.S", raster = T)
+```
+
+```{r fig.height=4, fig.width=4.5}
+FeaturePlot(XCA, features = "mafb.L", raster = T)
+```
+
+```{r}
+corr <- FetchData(XCA, vars = "mafb.S")
+corr <- cbind(corr, FetchData(XCA, vars = "mafb.L"))
+```
+
+```{r}
+Rosetta_stone <- read_excel("Rosetta_stone.xlsx")
+
+Xlaevis2human<- Rosetta_stone[ which(Rosetta_stone$Gene1SpeciesName =='Homo sapiens'
+& Rosetta_stone$Gene2SpeciesName=='Xenopus laevis'), ]
+```
+
+```{r}
+Mac_sign <- read_excel("Mac_sign_human.xlsx")
+
+Mac_sign <- Mac_sign$ortholog_name
+
+Mac_sign <- unique(Mac_sign)
+
+Mac_sign <- Xlaevis2human[ which(Xlaevis2human$Gene1Symbol %in% c(Mac_sign)), ]
+```
+
+```{r}
+DefaultAssay(XCA) <- "RNA"
+
+Mac_sign <- Mac_sign$Gene2Symbol
+
+Mac_sign <- intersect(Mac_sign, rownames(XCA))
+
+XCA <- AddModuleScore(XCA, features = list(c(Mac_sign)), name = "Mac_sign")
+```
+
+
+```{r}
+corr <- cbind(corr, FetchData(XCA, vars = "Mac_sign1"))
+
+cor.test(corr$mafb.S, corr$Mac_sign1, method = "pearson")
+cor.test(corr$mafb.L, corr$Mac_sign1, method = "pearson")
+```
+
+```{r fig.height=4, fig.width=4}
+p2 <- ggplot(corr, aes(x = mafb.S, y = Mac_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("mafb.S expression")+
+  ylab("Macrophage signature score")+
+  theme_classic()
+
+rasterize(p2, layers='Point', dpi=600)
+```
+
+```{r fig.height=4, fig.width=4}
+p3 <- ggplot(corr, aes(x = mafb.L, y = Mac_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("mafb.L expression")+
+  ylab("Macrophage signature score")+
+  theme_classic()
+
+rasterize(p3, layers='Point', dpi=600)
+```
+
+# Calculate correlation between MAFB expression and MafB target gene signature score
+
+```{r}
+
+Conserved_MafB_genes_human <- read.table("Conserved_MafB_genes.txt")
+
+
+Conserved_MafB_genes_human <- Conserved_MafB_genes_human$V1
+
+Conserved_MafB_genes_human <- unique(Conserved_MafB_genes_human)
+
+Conserved_MafB_genes_laevis <- Xlaevis2human[ which(Xlaevis2human$Gene1Symbol %in% c(Conserved_MafB_genes_human)), ]
+```
+
+```{r}
+
+
+Conserved_MafB_genes_laevis <- Conserved_MafB_genes_laevis$Gene2Symbol
+
+Conserved_MafB_genes_laevis <- unique(Conserved_MafB_genes_laevis)
+
+Conserved_MafB_genes_laevis <- intersect(Conserved_MafB_genes_laevis, rownames(XCA))
+
+XCA <- AddModuleScore(XCA, features = list(c(Conserved_MafB_genes_laevis)), name = "MafB_target_sign")
+```
+
+```{r}
+corr <- cbind(corr, FetchData(XCA, vars = "MafB_target_sign1"))
+
+cor.test(corr$mafb.S, corr$MafB_target_sign1, method = "pearson")
+cor.test(corr$mafb.L, corr$MafB_target_sign1, method = "pearson")
+```
+
+```{r fig.height=4, fig.width=4}
+p4 <- ggplot(corr, aes(x = mafb.S, y = MafB_target_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("mafb.S expression")+
+  ylab("MafB target gene signature score")+
+  theme_classic()
+
+rasterize(p4, layers='Point', dpi=600)
+```
+
+```{r fig.height=4, fig.width=4}
+p5 <- ggplot(corr, aes(x = mafb.L, y = MafB_target_sign1))+
+  geom_point(size = 0.1, colour="grey")+
+  geom_smooth(method='lm', colour = "black")+
+  xlab("mafb.L expression")+
+  ylab("MafB target gene signature score")+
+  theme_classic()
+
+rasterize(p5, layers='Point', dpi=600)
+```
+
+```{r}
+sessionInfo()
+```
+
+
+
