@@ -53,7 +53,7 @@ sceasy::convertFormat("TabulaSapiens.h5ad", from="anndata", to="seurat",
 # Load Tabula Sapiens Seurat object
 
 ```{r}
-TBS <- readRDS("TBS.rds")
+TBS <- readRDS("/media/uliege/T7/SingleCellAtlas/TBS.rds")
 ```
 
 # Visualize clusters
@@ -67,15 +67,14 @@ rasterize(p1, layers='Point', dpi=1200)
 
 # Calculate correlation between MAFB expression and Mac signature score
 
-Gene: MAFB ENSG00000204103
 ```{r fig.height=4, fig.width=4}
-FeaturePlot(TBS, features = "ENSG00000204103", raster = T)
+FeaturePlot(TBS, features = "MAFB", raster = T)
 ```
 
 ```{r}
 Mac_sign <- read_excel("Mac_sign_human.xlsx")
 
-Mac_sign <- Mac_sign$ortholog_ensg
+Mac_sign <- Mac_sign$ortholog_name
 
 Mac_sign <- intersect(Mac_sign, rownames(TBS))
 
@@ -85,20 +84,20 @@ TBS <- AddModuleScore(TBS, features = list(c(Mac_sign)), name = "Mac_sign")
 ```{r fig.height=4, fig.width=4}
 FeaturePlot(TBS, features = "Mac_sign1", raster = T)
 
-FeatureScatter(TBS, feature1 = "ENSG00000204103", feature2 = "Mac_sign1")+
+FeatureScatter(TBS, feature1 = "MAFB", feature2 = "Mac_sign1")+
   geom_smooth(method='lm', colour = "black")+
   theme(legend.position='none')
 ```
 
 ```{r}
-corr <- FetchData(TBS, vars = "ENSG00000204103") 
+corr <- FetchData(TBS, vars = "MAFB") 
 corr <- cbind(corr, FetchData(TBS, vars = "Mac_sign1"))
 
-cor.test(corr$ENSG00000204103, corr$Mac_sign1, method = "pearson")
+cor.test(corr$MAFB, corr$Mac_sign1, method = "pearson")
 ```
 
 ```{r fig.height=4, fig.width=4}
-p2 <- ggplot(corr, aes(x = ENSG00000204103, y = Mac_sign1))+
+p2 <- ggplot(corr, aes(x = MAFB, y = Mac_sign1))+
   geom_point(size = 0.1, colour="grey")+
   geom_smooth(method='lm', colour = "black")+
   xlab("MAFB Expression")+
@@ -111,19 +110,17 @@ rasterize(p2, layers='Point', dpi=600)
 # Calculate correlation between MAFB expression and MafB target gene signature score
 
 ```{r}
-MafB_target_sign <- read_excel("MafB_target_human.xlsx")
+Conserved_MafB_target_genes <- read.table("Conserved_MafB_genes.txt")
 
-MafB_target_sign <- MafB_target_sign$ortholog_ensg
+Conserved_MafB_target_genes <- intersect(Conserved_MafB_target_genes$V1, rownames(TBS))
 
-MafB_target_sign <- intersect(MafB_target_sign, rownames(TBS))
-
-TBS <- AddModuleScore(TBS, features = list(c(MafB_target_sign)), name = "MafB_target_sign")
+TBS <- AddModuleScore(TBS, features = list(c(Conserved_MafB_target_genes)), name = "MafB_target_sign")
 ```
 
 ```{r fig.height=4, fig.width=4}
 FeaturePlot(TBS, features = "MafB_target_sign1", raster = T)
 
-FeatureScatter(TBS, feature1 = "ENSG00000204103", feature2 = "MafB_target_sign1")+
+FeatureScatter(TBS, feature1 = "MAFB", feature2 = "MafB_target_sign1")+
   geom_smooth(method='lm', colour = "black")+
   theme(legend.position='none')
 ```
@@ -131,11 +128,11 @@ FeatureScatter(TBS, feature1 = "ENSG00000204103", feature2 = "MafB_target_sign1"
 ```{r}
 corr <- cbind(corr, FetchData(TBS, vars = "MafB_target_sign1"))
 
-cor.test(corr$ENSG00000204103, corr$MafB_target_sign1, method = "pearson")
+cor.test(corr$MAFB, corr$MafB_target_sign1, method = "pearson")
 ```
 
 ```{r fig.height=4, fig.width=4}
-p3 <- ggplot(corr, aes(x = ENSG00000204103, y = MafB_target_sign1))+
+p3 <- ggplot(corr, aes(x = MAFB, y = MafB_target_sign1))+
   geom_point(size = 0.1, colour="grey")+
   geom_smooth(method='lm', colour = "black")+
   xlab("MAFB Expression")+
