@@ -47,7 +47,7 @@ https://dreamapp.biomed.au.dk/pigatlas/
 # Load Pig Cell Atlas Seurat object
 
 ```{r}
-PCA <- readRDS("pig_atlas_20221014.rds")
+PCA <- readRDS("/media/uliege/T7/SingleCellAtlas/PCA.rds")
 ```
 
 # Visualize clusters
@@ -65,7 +65,14 @@ rasterize(p1, layers='Point', dpi=1200)
 FeaturePlot(PCA, features = "MAFB", reduction = "tsne", raster = T)
 ```
 
+
 ```{r}
+DefaultAssay(PCA) <- "alra"
+corr <- FetchData(PCA, vars = "MAFB") 
+```
+
+```{r}
+DefaultAssay(PCA) <- "RNA"
 Mac_sign <- read_excel("Mac_sign_pig.xlsx")
 
 Mac_sign <- Mac_sign$ortholog_name
@@ -75,14 +82,8 @@ Mac_sign <- intersect(Mac_sign, rownames(PCA))
 PCA <- AddModuleScore(PCA, features = list(c(Mac_sign)), name = "Mac_sign")
 ```
 
-```{r fig.height=4, fig.width=4}
-FeatureScatter(PCA, feature1 = "MAFB", feature2 = "Mac_sign1", raster = T)+
-  geom_smooth(method='lm', colour = "black")+
-  theme(legend.position='none')
-```
 
 ```{r}
-corr <- FetchData(PCA, vars = "MAFB") 
 corr <- cbind(corr, FetchData(PCA, vars = "Mac_sign1"))
 
 cor.test(corr$MAFB, corr$Mac_sign1, method = "pearson")
@@ -101,23 +102,18 @@ rasterize(p2, layers='Point', dpi=600)
 # Calculate correlation between MAFB expression and MafB target gene signature score
 
 ```{r}
-MafB_target_sign <- read_excel("MafB_target_pig.xlsx")
+Conserved_MafB_target_genes <- read.csv("Conserved_MafB_target_genes_Pig.csv")
 
 
-MafB_target_sign <- MafB_target_sign$ortholog_name
+Conserved_MafB_target_genes<- Conserved_MafB_target_genes$ortholog_name
 
-MafB_target_sign <- unique(MafB_target_sign)
+Conserved_MafB_target_genes <- unique(Conserved_MafB_target_genes)
 
-MafB_target_sign <- intersect(MafB_target_sign, rownames(PCA))
+Conserved_MafB_target_genes <- intersect(Conserved_MafB_target_genes, rownames(PCA))
 
-PCA <- AddModuleScore(PCA, features = list(c(MafB_target_sign)), name = "MafB_target_sign")
+PCA <- AddModuleScore(PCA, features = list(c(Conserved_MafB_target_genes)), name = "MafB_target_sign")
 ```
 
-```{r fig.height=4, fig.width=4.5}
-FeatureScatter(PCA, feature1 = "MAFB", feature2 = "MafB_target_sign1", raster = F)+
-  geom_smooth(method='lm', colour = "black")+
-  theme(legend.position='none')
-```
 
 ```{r}
 corr <- cbind(corr, FetchData(PCA, vars = "MafB_target_sign1"))
