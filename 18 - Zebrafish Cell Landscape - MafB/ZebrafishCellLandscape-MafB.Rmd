@@ -148,14 +148,14 @@ rasterize(p3, layers='Point', dpi=600)
 
 # Calculate correlation between mafb expression and MafB target gene signature score
 ```{r}
-MafB_target_danio <- read_excel("MafB_target_danio.xlsx")
+Conserved_MafB_target_genes <- read.csv("Conserved_MafB_target_genes_ZebraFish.csv")
 
-MafB_target_danio <- MafB_target_danio$ortholog_name
+Conserved_MafB_target_genes <- Conserved_MafB_target_genes$ortholog_name
 
-MafB_target_danio <- intersect(MafB_target_danio, rownames(ZCL))
+Conserved_MafB_target_genes <- intersect(Conserved_MafB_target_genes, rownames(ZCL))
 
 
-ZCL <- AddModuleScore(ZCL, features = list(c(MafB_target_danio)), name = "MafB_target_sign")
+ZCL <- AddModuleScore(ZCL, features = list(c(Conserved_MafB_target_genes)), name = "MafB_target_sign")
 ```
 
 ```{r fig.height=4, fig.width=4}
