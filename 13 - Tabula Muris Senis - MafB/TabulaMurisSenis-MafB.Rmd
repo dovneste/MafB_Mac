@@ -41,7 +41,7 @@ library(ggrastr)
 # Load Tabula Muris Senis Seurat object
 
 ```{r}
-tbms <- readRDS("tbms.rds")
+tbms <- readRDS("/media/uliege/T7/SingleCellAtlas/tbms.rds")
 ```
 
 # Visualize clusters
@@ -95,10 +95,12 @@ rasterize(p2, layers='Point', dpi=600)
 # Calculate correlation between Mafb expression and MafB target gene signature score
 
 ```{r}
-MafB_Peaks <- read_excel("MafB_Peaks.xlsx")
-MafB_target_sign <- MafB_Peaks$`Gene Name`
-MafB_target_sign <- intersect(MafB_target_sign, rownames(tbms))
-tbms <- AddModuleScore(tbms, features = list(c(MafB_target_sign)), name = "MafB_target_sign")
+MafB_target_genes <- read.csv("Conserved_MafB_target_genes_mouse.csv")
+
+MafB_target_genes <- na.omit(unique(MafB_target_genes$ortholog_name))
+
+MafB_target_genes <- intersect(MafB_target_genes, rownames(tbms))
+tbms <- AddModuleScore(tbms, features = list(c(MafB_target_genes)), name = "MafB_target_sign")
 ```
 
 ```{r}
