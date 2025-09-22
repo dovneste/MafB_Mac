@@ -60,7 +60,7 @@ sceasy::convertFormat("tabula-muris-senis-bbknn-processed-official-annotations.h
 
 # Load Seurat object
 ```{r}
-tbms <- readRDS(file = "tbms.rds")
+tbms <- readRDS(file = "/media/uliege/T7/SingleCellAtlas/tbms.rds")
 ```
 
 
@@ -119,6 +119,19 @@ DimPlot(tbms_myeloid, label = T, raster = T)
 
 ```{r}
 DimPlot(tbms_myeloid, group.by = "tissue", label = T, raster = T)
+```
+
+```{r}
+# Make a table of counts
+table_counts <- table(tbms_myeloid@active.ident, tbms_myeloid$tissue)
+
+# Convert to proportions (percentages)
+table_percent <- prop.table(table_counts, margin = 1) * 100
+
+# View counts and percentages
+print(table_counts)
+print(round(table_percent, 1))
+
 ```
 
 # Removal of contaminating cells
