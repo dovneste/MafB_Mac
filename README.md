@@ -1,7 +1,7 @@
 Dear reader,
 this GitHub repository is the deposit of source codes for the bioinformatic analyses in the paper:
 
-# MafB is a conserved transcriptional regulator of macrophage development and identity across tissues and species
+# MafB is a conserved transcriptional regulator of macrophage development and functional identity across tissues and species
 
 ## Authors
 Domien Vanneste<sup>1,2,\*</sup>, Wen Peng<sup>1,2</sup>, Zhuangzhuang Liu<sup>3,4</sup>, Malik Hamaïdia<sup>5</sup>, Raphaël La Rocca<sup>1,2</sup>, Joan Abinet<sup>1,2</sup>, Alexis Balthazar<sup>2,6</sup>, Fabienne Perin<sup>7</sup>, Alexandre Hego<sup>8</sup>, Didier Cataldo<sup>7</sup>, Fabrice Bureau<sup>2,9</sup>, Philippe Compère<sup>10,11</sup>, Bénédicte Machiels<sup>2,6</sup>, Charlotte L. Scott<sup>3,4</sup>, Coraline Radermecker<sup>1,2</sup> & Thomas Marichal<sup>1,2,12,13,\*</sup>
